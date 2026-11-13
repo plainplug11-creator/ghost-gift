@@ -1,0 +1,46 @@
+/* ═════════ Decorative layer: neon accents, shines, twinkles (transform/opacity only; off on low tier) ═════════ */
+.tw-star, .gc-tw i, .cd-tw i { clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); }
+
+/* home: game cards get a periodic glass shine + corner twinkles */
+.gc-shine { position: absolute; top: -10%; bottom: -10%; left: -60%; width: 40%; z-index: 1; pointer-events: none; opacity: 0;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.16) 50%, transparent); transform: skewX(-14deg); }
+html:not([data-tier="low"]):not(.reduce-motion) .gc-shine { animation: gc-shine 6.5s ease-in-out infinite; }
+.game-card:nth-child(2) .gc-shine { animation-delay: 1.6s; } .game-card:nth-child(3) .gc-shine { animation-delay: 3.2s; } .game-card:nth-child(4) .gc-shine { animation-delay: 4.8s; }
+@keyframes gc-shine { 0% { opacity: 0; transform: translateX(0) skewX(-14deg); } 4% { opacity: 1; } 18%, 100% { opacity: 0; transform: translateX(420%) skewX(-14deg); } }
+.gc-tw { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.gc-tw i { position: absolute; width: 9px; height: 9px; background: #fff; opacity: 0.5; }
+.gc-tw i:nth-child(1) { left: 14%; top: 12%; background: #9ff3ff; } .gc-tw i:nth-child(2) { right: 22%; top: 30%; width: 6px; height: 6px; background: #ff9ee0; }
+.gc-tw i:nth-child(3) { left: 30%; top: 44%; width: 5px; height: 5px; background: #c9a6ff; }
+html:not([data-tier="low"]):not(.reduce-motion) .gc-tw i { animation: tw 2.6s ease-in-out infinite; }
+.gc-tw i:nth-child(2) { animation-delay: -0.9s !important; } .gc-tw i:nth-child(3) { animation-delay: -1.7s !important; }
+.game-card:nth-child(even) .gc-tw i { animation-duration: 3.1s !important; }
+@keyframes tw { 0%, 100% { opacity: 0; transform: scale(0.4) rotate(0deg); } 50% { opacity: 1; transform: scale(1.15) rotate(45deg); } }
+
+/* home: glowing divider under the title */
+.hero-line { display: block; width: 120px; height: 3px; margin-top: 8px; border-radius: 2px; position: relative; overflow: hidden;
+  background: linear-gradient(90deg, #46e6ff, #a65cff 55%, #ff5ccc); box-shadow: 0 0 12px rgba(166, 92, 255, 0.8); }
+.hero-line::after { content: ""; position: absolute; top: 0; bottom: 0; left: -40%; width: 40%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.9), transparent); }
+html:not([data-tier="low"]):not(.reduce-motion) .hero-line::after { animation: line-run 3.2s ease-in-out infinite; }
+@keyframes line-run { 0% { transform: translateX(0); } 60%, 100% { transform: translateX(400%); } }
+
+/* case page: slow light rays + twinkles behind the case, glowing section divider, shine on the open button */
+.cd-rays { position: absolute; left: 50%; top: calc(50% + 39px); width: 420px; height: 420px; margin: -210px 0 0 -210px; border-radius: 50%; pointer-events: none; opacity: 0.4;
+  background: repeating-conic-gradient(from 0deg, transparent 0 8deg, rgba(var(--glow), 0.28) 11deg, transparent 14deg 24deg);
+  -webkit-mask-image: radial-gradient(closest-side, #000 20%, transparent 85%); mask-image: radial-gradient(closest-side, #000 20%, transparent 85%); }
+html:not([data-tier="low"]):not(.reduce-motion) .cd-rays { animation: rays-turn 40s linear infinite; }
+@keyframes rays-turn { to { transform: rotate(360deg); } }
+.cd-tw { position: absolute; left: 50%; top: calc(50% + 39px); width: 0; height: 0; pointer-events: none; z-index: 2; }
+.cd-tw i { position: absolute; width: 12px; height: 12px; margin: -6px; background: #fff; opacity: 0.6; }
+.cd-tw i:nth-child(1) { transform: translate(-128px, -70px); background: #9ff3ff; } .cd-tw i:nth-child(2) { transform: translate(122px, -40px); background: #ff9ee0; }
+.cd-tw i:nth-child(3) { transform: translate(-112px, 64px); width: 8px; height: 8px; } .cd-tw i:nth-child(4) { transform: translate(132px, 70px); background: #c9a6ff; width: 9px; height: 9px; }
+.cd-tw i:nth-child(5) { transform: translate(-60px, -104px); width: 7px; height: 7px; background: #ff9ee0; } .cd-tw i:nth-child(6) { transform: translate(70px, 104px); width: 8px; height: 8px; background: #9ff3ff; }
+html:not([data-tier="low"]):not(.reduce-motion) .cd-tw i { animation: tw-o 2.4s ease-in-out infinite; }
+.cd-tw i:nth-child(2n) { animation-delay: -0.8s !important; } .cd-tw i:nth-child(3n) { animation-delay: -1.6s !important; }
+@keyframes tw-o { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+.cd-sec { position: relative; padding-bottom: 8px; }
+.cd-sec::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: linear-gradient(90deg, rgba(70, 230, 255, 0.7), rgba(166, 92, 255, 0.5) 50%, transparent); }
+.cd-open { position: relative; overflow: hidden; }
+.cd-open::after { content: ""; position: absolute; top: 0; bottom: 0; left: -40%; width: 30%; pointer-events: none;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.35), transparent); transform: skewX(-16deg); opacity: 0; }
+html:not([data-tier="low"]):not(.reduce-motion) .cd-open:not(:disabled)::after { animation: btn-shine 3.6s ease-in-out infinite; }
+@keyframes btn-shine { 0% { opacity: 0; transform: translateX(0) skewX(-16deg); } 8% { opacity: 1; } 35%, 100% { opacity: 0; transform: translateX(520%) skewX(-16deg); } }

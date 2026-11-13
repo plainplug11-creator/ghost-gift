@@ -1,17 +1,18 @@
 /* ═════════ Ghost on a branch (src/ui/perch.ts) — palette: navy/black, cyan, violet, magenta; orange = leaves only ═════════ */
-.perch { --pm: 72px; position: absolute; right: 0; width: 170px; height: calc(var(--pm) + 40px); pointer-events: none; }
-.pc-branch { position: absolute; right: 0; bottom: 0; width: 170px; height: 60px; overflow: visible; transform-origin: 100% 50%;
-  filter: drop-shadow(0 6px 8px rgba(0, 0, 12, 0.55)); }
-.pc-leaf { position: absolute; width: 24px; height: 24px; }
-.pc-leaf .ji { --ji: 24px; display: block; filter: drop-shadow(0 2px 3px rgba(0, 0, 12, 0.5)); }
-.pc-leaf.l1 { left: 41px; bottom: 45px; transform: rotate(-20deg); }
-.pc-leaf.l2 { left: 6px; bottom: 12px; transform: rotate(150deg); }
-.pc-leaf.l3 { left: 70px; bottom: 30px; transform: rotate(-58deg) scale(.8); }
-.perch:not(.is-lite) .pc-leaf.l1 .ji { animation: pc-sway 3.8s ease-in-out infinite; transform-origin: 50% 100%; }
-.perch:not(.is-lite) .pc-leaf.l3 .ji { animation: pc-sway 4.6s ease-in-out -1.2s infinite; transform-origin: 50% 0; }
-@keyframes pc-sway { 50% { transform: rotate(9deg); } }
-
-.pc-ghost { position: absolute; width: var(--pm); height: var(--pm); right: calc(42px - var(--pm) / 2); bottom: calc(33px - var(--pm) * 0.085);
+.perch { --pm: 80px; --gpos: 0.74; position: absolute; left: 0; right: 0; height: calc(var(--pm) + 50px); pointer-events: none; }
+.pc-bough { position: absolute; left: 0; right: 0; bottom: 0; height: 80px; transform-origin: 0 50%; }
+.perch:not(.is-lite) .pc-bough { animation: bough-sway 7s ease-in-out infinite; }
+@keyframes bough-sway { 50% { transform: rotate(0.5deg) translateY(1px); } }
+.pc-branch { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 8px 10px rgba(0, 0, 12, 0.6)); }
+.pc-leaf { position: absolute; width: 26px; height: 26px; margin-left: -13px; transform: rotate(var(--r)) scale(var(--s)); }
+.pc-leaf .ji { --ji: 26px; display: block; filter: drop-shadow(0 2px 3px rgba(0, 0, 12, 0.5)); transform-origin: 50% 90%; }
+.perch:not(.is-lite) .pc-leaf .ji { animation: pc-sway var(--d) ease-in-out infinite; }
+.perch:not(.is-lite) .pc-leaf:nth-child(odd) .ji { animation-delay: -1.7s; }
+@keyframes pc-sway { 50% { transform: rotate(10deg); } }
+.pc-falls { position: absolute; left: 0; right: 0; bottom: 30px; height: 0; }
+.pc-fall { position: absolute; top: 0; width: 22px; height: 22px; opacity: 0; }
+.pc-fall .ji { --ji: 22px; display: block; }
+.pc-ghost { position: absolute; width: var(--pm); height: var(--pm); left: calc(var(--gpos) * 100% - var(--pm) / 2); bottom: calc(45px - var(--pm) * 0.085);
   transform-origin: 50% 92%; transition: transform 0.5s var(--spring-bouncy, cubic-bezier(.34,1.56,.64,1)); pointer-events: auto; cursor: pointer; }
 .pc-shadow { position: absolute; left: 10%; right: 10%; top: 12%; bottom: 8%; border-radius: 50%; background: radial-gradient(closest-side, rgba(63, 227, 255, 0.22), rgba(166, 92, 255, 0.1) 60%, transparent); }
 .pc-body { position: absolute; inset: 0; transform-origin: 50% 92%; }
@@ -48,13 +49,13 @@
 .perch[data-mood="ecstatic"] .pc-blush ellipse { opacity: 0.6; }
 
 /* sparkles (4-point stars) */
-.pc-sparks { position: absolute; width: 0; height: 0; right: 42px; bottom: calc(33px + var(--pm) * 0.55); }
+.pc-sparks { position: absolute; width: 0; height: 0; left: calc(var(--gpos) * 100%); bottom: calc(45px + var(--pm) * 0.55); }
 .pc-sparks i { position: absolute; left: -7px; top: -7px; width: 14px; height: 14px; opacity: 0;
   clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); background: #fff; }
 .pc-sparks i:nth-child(3n+1) { background: #9ff3ff; } .pc-sparks i:nth-child(3n+2) { background: #ff9ee0; } .pc-sparks i:nth-child(4) { background: #c9a6ff; }
 
 /* speech bubble — glass like the cards; tail points at the ghost */
-.pc-bubble { position: absolute; right: calc(42px + var(--pm) / 2 + 4px); bottom: calc(33px + var(--pm) * 0.6); max-width: 168px; width: max-content;
+.pc-bubble { position: absolute; right: calc((1 - var(--gpos)) * 100% + var(--pm) / 2 + 2px); bottom: calc(45px + var(--pm) * 0.6); max-width: 168px; width: max-content;
   padding: 8px 12px; border-radius: 16px 16px 6px 16px; font-size: 13.5px; font-weight: 780; line-height: 1.2; color: #fff; text-align: center;
   text-shadow: 0 1px 6px rgba(4, 5, 20, 0.6); opacity: 0; transform: scale(0.5) translateY(6px); transform-origin: 100% 100%;
   transition: opacity 0.18s ease, transform 0.4s cubic-bezier(.34,1.56,.64,1); }
@@ -63,16 +64,17 @@
 .pc-bubble.is-on { opacity: 1; transform: none; }
 
 /* placements */
-.op-perch { z-index: 0; }
+.op-perch { z-index: 0; opacity: 0; transition: opacity 0.45s ease 0.1s; }
 .op > .op-stage { z-index: 1; }
 .op-reel, .op-reveal, .op-flash, .op-confetti, .op-skip, .op-demo { z-index: 2; }
-.op-perch { opacity: 0; transition: opacity 0.45s ease 0.1s; }
 .op.is-in .op-perch { opacity: 1; }
-.cd-hero .perch { --pm: 64px; top: -12px; right: calc(var(--pad, 16px) * -1); z-index: 0; }
+.pc-actor { position: absolute; inset: 0; }
+.op-perch .pc-actor { transition: transform 0.75s cubic-bezier(.34,1.3,.64,1); }
+/* reveal: the ghost leaps off the bough to cheer beside/below the prize card; the bough fades out of the card's way */
+.op.is-reveal .op-perch .pc-actor { transform: translate(var(--aside, 0px), var(--drop, 0px)); }
+.op.is-reveal .op-perch { z-index: 3; }
+.op-perch .pc-bough { transition: opacity 0.4s ease; }
+.op.is-reveal .op-perch .pc-bough { opacity: 0; }
+.cd-hero .perch { --pm: 66px; --gpos: 0.86; top: 0; left: calc(var(--pad, 16px) * -1); right: calc(var(--pad, 16px) * -1); z-index: 0; }
 .cd-hero .cd-float { z-index: 1; }
-/* reveal: hop aside so the prize card + title stay clear; bubble rides above */
-.op-perch { transform-origin: 100% 70%; transition: opacity 0.45s ease 0.1s, transform 0.6s cubic-bezier(.34,1.4,.64,1); }
-.op.is-reveal .op-perch { z-index: 3; transform: translate(2px, 6px) scale(0.8); }
-@media (min-width: 420px) { .op.is-reveal .op-perch { transform: translate(6px, 0) scale(0.9); } }
-/* case page header: room above the case for the branch */
-.cd-hero { height: 268px; padding-top: 44px; box-sizing: border-box; }
+.cd-hero { height: 296px; padding-top: 78px; box-sizing: border-box; }

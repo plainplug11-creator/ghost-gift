@@ -4,6 +4,7 @@ import './styles/components.css';
 import './styles/games.css';
 import './styles/icons.css';
 import './styles/screens.css';
+import './styles/decor.css';
 
 import { h } from './core/dom';
 import { initPerf } from './core/perf';

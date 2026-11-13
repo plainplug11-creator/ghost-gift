@@ -41,7 +41,7 @@ export function createCase(id: string): Page {
 
   // ── hero ──
   const hero = h('div', { class: 'cd-hero', style: `--glow:${c.glow[0]};--glow2:${c.glow[1]}` });
-  hero.append(html(`<span class="cd-halo"></span><span class="cd-float">${caseImg(c, 'cd-img', '240px')}</span><span class="cd-floor"></span>`));
+  hero.append(html(`<span class="cd-rays" aria-hidden="true"></span><span class="cd-tw" aria-hidden="true">${'<i></i>'.repeat(6)}</span><span class="cd-halo"></span><span class="cd-float">${caseImg(c, 'cd-img', '240px')}</span><span class="cd-floor"></span>`));
   // header: our ghost on an autumn branch, looking down at the case; tap = hop
   const perch = createPerch({ bubble: false });
   hero.prepend(perch.el);

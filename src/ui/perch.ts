@@ -66,19 +66,30 @@ const FACE = `<svg class="pc-face" viewBox="0 0 512 512" aria-hidden="true">
   <path class="pc-sweat" d="M372 120 Q384 140 380 150 A11 11 0 1 1 362 146 Q362 136 372 120Z"/>
 </svg>`;
 
-// branch: dark navy bark + subtle neon rim (cyan→violet), thick end at the screen edge (right)
-const BRANCH = `<svg class="pc-branch" viewBox="0 0 170 60" aria-hidden="true">
+// branch: thick dark-navy bough spanning the full width (left → right), subtle neon rim; orange only on leaves
+const NS = 'vector-effect="non-scaling-stroke"';
+const BRANCH = `<svg class="pc-branch" viewBox="0 0 400 80" preserveAspectRatio="none" aria-hidden="true">
   <defs>
-    <linearGradient id="pcBark" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#22245a"/><stop offset=".45" stop-color="#121434"/><stop offset="1" stop-color="#06071a"/></linearGradient>
-    <linearGradient id="pcRim" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#a65cff" stop-opacity=".2"/><stop offset=".45" stop-color="#a65cff" stop-opacity=".75"/><stop offset="1" stop-color="#46e6ff" stop-opacity=".95"/></linearGradient>
+    <linearGradient id="pcBark" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#262a66"/><stop offset=".4" stop-color="#14163c"/><stop offset="1" stop-color="#05061a"/></linearGradient>
+    <linearGradient id="pcRim" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#46e6ff" stop-opacity=".95"/><stop offset=".5" stop-color="#a65cff" stop-opacity=".8"/><stop offset="1" stop-color="#ff5ccc" stop-opacity=".7"/></linearGradient>
   </defs>
-  <path d="M62 27 C57 19 53 12 53 4" fill="none" stroke="#17194a" stroke-width="5" stroke-linecap="round"/>
-  <path d="M62 27 C57 19 53 12 53 4" fill="none" stroke="url(#pcRim)" stroke-width="1.1" stroke-linecap="round" opacity=".8"/>
-  <path d="M176 19 C140 20 110 21 82 23 C56 25 30 26 7 27 C3 28 3 31 7 31 C30 32 56 34 82 37 C110 40 140 43 176 46 Z" fill="url(#pcBark)"/>
-  <path d="M176 19 C140 20 110 21 82 23 C56 25 30 26 7 27" fill="none" stroke="url(#pcRim)" stroke-width="1.8" stroke-linecap="round"/>
-  <g stroke="#04050f" stroke-width="1.6" stroke-linecap="round" opacity=".75"><path d="M156 32 l9 1"/><path d="M118 31 l8 1"/><path d="M84 30 l7 1"/><path d="M40 29 l5 0"/></g>
-  <ellipse cx="146" cy="30" rx="3.2" ry="2.2" fill="#04050f" opacity=".7"/>
+  <g fill="none" stroke-linecap="round">
+    <path d="M70 30 C64 18 66 8 78 2" stroke="#17194a" stroke-width="7" ${NS}/><path d="M70 30 C64 18 66 8 78 2" stroke="url(#pcRim)" stroke-width="1.2" ${NS} opacity=".7"/>
+    <path d="M296 32 C304 20 314 13 330 10" stroke="#17194a" stroke-width="6" ${NS}/><path d="M296 32 C304 20 314 13 330 10" stroke="url(#pcRim)" stroke-width="1.1" ${NS} opacity=".7"/>
+    <path d="M150 48 C156 60 152 70 162 78" stroke="#111338" stroke-width="6" ${NS}/>
+    <path d="M360 40 C368 50 366 58 374 66" stroke="#111338" stroke-width="5" ${NS}/>
+  </g>
+  <path d="M-6 10 C70 18 150 32 222 30 C290 28 340 22 406 24 L406 48 C340 46 290 54 222 56 C150 58 70 64 -6 70 Z" fill="url(#pcBark)"/>
+  <path d="M-6 10 C70 18 150 32 222 30 C290 28 340 22 406 24" fill="none" stroke="url(#pcRim)" stroke-width="2.4" ${NS}/>
+  <path d="M-6 70 C70 64 150 58 222 56 C290 54 340 46 406 48" fill="none" stroke="#a65cff" stroke-opacity=".35" stroke-width="1.2" ${NS}/>
+  <g stroke="#04050f" stroke-width="1.6" stroke-linecap="round" opacity=".7" fill="none"><path d="M24 38 l14 1" ${NS}/><path d="M96 41 l12 0" ${NS}/><path d="M190 42 l10 0" ${NS}/><path d="M262 38 l12 -1" ${NS}/><path d="M340 34 l10 0" ${NS}/></g>
+  <ellipse cx="120" cy="42" rx="5" ry="3.4" fill="#04050f" opacity=".7"/><ellipse cx="250" cy="40" rx="4" ry="3" fill="#04050f" opacity=".6"/>
 </svg>`;
+// leaf spots along the bough: x%, bottom px (within the 80px branch box), rotation, scale, sway period
+const LEAVES: [number, number, number, number, number][] = [
+  [3, 46, -30, 1.05, 4.2], [9, 22, 160, 0.9, 5.1], [17.5, 70, -20, 1.1, 3.8], [21, 58, 30, 0.85, 4.6], [34, 20, 190, 0.95, 5.4],
+  [38, 1, 200, 1, 4.4], [47, 42, -50, 0.8, 3.9], [56, 22, 170, 0.9, 5.0], [80, 70, 10, 1.05, 4.1], [83.5, 58, 60, 0.85, 4.8], [92, 10, 195, 0.95, 4.5], [97, 44, -35, 0.9, 5.2],
+];
 
 export interface Perch {
   el: HTMLElement;
@@ -93,15 +104,17 @@ export interface Perch {
   destroy(): void;
 }
 
-export function createPerch(opts: { cls?: string; size?: number; bubble?: boolean } = {}): Perch {
+export function createPerch(opts: { cls?: string; size?: number; bubble?: boolean; pos?: number } = {}): Perch {
   const lite = tier === 'low' || reducedMotion;
   const el = h('div', { class: `perch ${opts.cls ?? ''}${lite ? ' is-lite' : ''}`, 'data-mood': 'idle' });
   if (opts.size) el.style.setProperty('--pm', `${opts.size}px`);
-  el.innerHTML = `${BRANCH}
-    <span class="pc-leaf l1">${ji('leaf')}</span><span class="pc-leaf l2">${ji('leaf')}</span><span class="pc-leaf l3">${ji('leaf')}</span>
-    <div class="pc-ghost"><i class="pc-shadow"></i><div class="pc-body"><div class="pc-inner"><img class="pc-img" src="${blank}" alt="" draggable="false" decoding="async">${FACE}</div></div></div>
+  if (opts.pos) el.style.setProperty('--gpos', String(opts.pos));
+  el.innerHTML = `<div class="pc-bough">${BRANCH}
+    ${LEAVES.map(([x, b, r, sc, d], i) => `<span class="pc-leaf${i === 6 ? ' l2' : ''}" style="left:${x}%;bottom:${b}px;--r:${r}deg;--s:${sc};--d:${d}s">${ji('leaf')}</span>`).join('')}</div>
+    <div class="pc-falls"><span class="pc-fall">${ji('leaf')}</span><span class="pc-fall">${ji('leaf')}</span></div>
+    <div class="pc-actor">    <div class="pc-ghost"><i class="pc-shadow"></i><div class="pc-body"><div class="pc-inner"><img class="pc-img" src="${blank}" alt="" draggable="false" decoding="async">${FACE}</div></div></div>
     <div class="pc-sparks">${Array.from({ length: 7 }, (_, i) => `<i style="--k:${i}"></i>`).join('')}</div>
-    ${opts.bubble === false ? '' : '<div class="pc-bubble glass"><span></span></div>'}`;
+    ${opts.bubble === false ? '' : '<div class="pc-bubble glass"><span></span></div>'}</div>`;
   const $ = (s: string) => el.querySelector(s) as HTMLElement;
   const ghost = $('.pc-ghost'), body = $('.pc-body'), look = el.querySelector('.pc-look') as SVGGElement;
   const bubble = el.querySelector<HTMLElement>('.pc-bubble'), btext = bubble?.querySelector('span');
@@ -149,7 +162,7 @@ export function createPerch(opts: { cls?: string; size?: number; bubble?: boolea
         const j = (dy: number, r: number) => ({ transform: `translateY(${dy}px) rotate(${r}deg) scale(.95,1.06)` });
         anim(body, [{ transform: 'none' }, j(-18, -8), { transform: 'scale(1.08,.9)', offset: 0.33 }, j(-16, 8), { transform: 'scale(1.06,.92)', offset: 0.66 }, j(-10, 0), { transform: 'none' }],
           { duration: 1300, easing: 'ease-in-out' });
-        anim(el.querySelector('.pc-branch')!, [{ transform: 'none' }, { transform: 'rotate(1.6deg)', offset: 0.36 }, { transform: 'rotate(-1deg)', offset: 0.6 }, { transform: 'none' }], { duration: 1300, easing: 'ease-in-out' });
+        anim(el.querySelector('.pc-bough')!, [{ transform: 'none' }, { transform: 'rotate(1.6deg)', offset: 0.36 }, { transform: 'rotate(-1deg)', offset: 0.6 }, { transform: 'none' }], { duration: 1300, easing: 'ease-in-out' });
         sparks(7); later(() => sparks(5), 650);
         if (!lite) anim($('.pc-leaf.l2'), [{ transform: 'none', opacity: 1 }, { transform: 'translate(-30px,170px) rotate(260deg)', opacity: 0 }], { duration: 2200, delay: 250, easing: 'cubic-bezier(.4,.1,.6,1)', fill: 'forwards' });
         break;
@@ -178,6 +191,17 @@ export function createPerch(opts: { cls?: string; size?: number; bubble?: boolea
   function hop() { anim(body, [{ transform: 'none' }, { transform: 'translateY(-10px) scale(.96,1.05)', offset: 0.35 }, { transform: 'scale(1.05,.94)', offset: 0.65 }, { transform: 'none' }], { duration: 560, easing: 'ease-out' }); }
 
   ghost.addEventListener('click', () => { hop(); });
+  // now and then a leaf lets go and drifts down (rich tiers only)
+  let fallT = 0, fi = 0;
+  const falls = Array.from(el.querySelectorAll<HTMLElement>('.pc-fall'));
+  const dropLeaf = () => {
+    const f = falls[fi++ % falls.length], x = 6 + Math.random() * 88, dx = (Math.random() - 0.5) * 60;
+    f.style.left = `${x}%`;
+    f.animate([{ transform: 'translate(0,0) rotate(0deg)', opacity: 0 }, { opacity: 1, offset: 0.1 }, { transform: `translate(${dx * 0.5}px,45px) rotate(120deg)`, offset: 0.45 },
+      { transform: `translate(${dx}px,110px) rotate(260deg)`, opacity: 0 }], { duration: 3600, easing: 'ease-in' });
+    fallT = window.setTimeout(dropLeaf, 4500 + Math.random() * 4000);
+  };
+  if (!lite) fallT = window.setTimeout(dropLeaf, 1800 + Math.random() * 2000);
   lookAt(-6, 5);
-  return { el, setMood, lookAt, flick, say, hop, destroy() { timers.forEach(clearTimeout); clearTimeout(bubbleT); } };
+  return { el, setMood, lookAt, flick, say, hop, destroy() { timers.forEach(clearTimeout); clearTimeout(bubbleT); clearTimeout(fallT); } };
 }

@@ -14,6 +14,8 @@ function card(id: PushId, title: I18nKey, sub: string, art: string, extra?: HTML
     html(`<span class="gc-art">${art}</span>`),
     h('span', { class: 'gc-meta' }, h('span', { class: 'gc-title' }, t(title)), h('span', { class: 'gc-sub' }, ...(subNodes(sub)))),
     html(`<span class="gc-go">${glyphChevron}</span>`),
+    html('<span class="gc-shine" aria-hidden="true"></span>'),
+    html('<span class="gc-tw" aria-hidden="true"><i></i><i></i><i></i></span>'),
   );
   if (extra) el.append(extra);
   el.addEventListener('click', () => navigate.push(id));
@@ -73,6 +75,7 @@ export function createHome() {
     h('div', { class: 'hero-text' },
       h('span', { class: 'hero-greet' }, `${greeting()}, ${tg.user.first_name}`),
       h('h1', { class: 'hero-title' }, t('home.title')),
+      h('span', { class: 'hero-line', 'aria-hidden': 'true' }),
     ),
     html(`<span class="season-chip">${ji('leaf')}${t('home.season')}</span>`),
   );

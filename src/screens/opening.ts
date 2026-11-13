@@ -3,9 +3,10 @@ import { fmt, t } from '../core/i18n';
 import { reducedMotion, tier } from '../core/perf';
 import { tg } from '../core/telegram';
 import { sfx } from '../core/sound';
-import { PRIZES } from '../api/catalog';
+import { PRIZES, caseStats } from '../api/catalog';
+import { countTo } from '../ui/countup';
 import { RARITY_RANK, type CaseDef, type OpenResult, type Prize } from '../api/types';
-import { RARITY_RGB, caseArt, prizeIcon, prizeName, rarityName } from '../art/cases';
+import { RARITY_RGB, caseArt, caseName, prizeIcon, prizeName, rarityName } from '../art/cases';
 import { confetti } from '../ui/confetti';
 import { createPerch } from '../ui/perch';
 import '../styles/perch.css';
@@ -20,7 +21,7 @@ import '../styles/perch.css';
  * one canvas for confetti). Skip fast-forwards any phase.
  */
 
-const GAP = 12;             // px between cells (tile size is responsive, see spin())
+const GAP = 8;              // classic continuous strip (tile size is responsive, see run())
 const N = 58;              // tiles in the strip
 const WIN = 50;            // winner index
 
@@ -61,6 +62,9 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
   const jitterU = nearMiss ? -1 : Math.random() - 0.5; // resolved to px once the tile size is known
 
   const [, art] = caseArt(c);
+  const ch = (caseStats(c).rows.find((r) => r.prize.id === prize.id)?.chance ?? 0) * 100;
+  const chanceTxt = `${ch >= 10 ? ch.toFixed(1) : ch >= 1 ? ch.toFixed(2) : ch.toFixed(3)}%`;
+  const caseNameTxt = caseName(c);
   const el = h('div', { class: `op r-${prize.rarity}${epicMoment ? ' is-epic' : ''}${tier === 'low' ? ' tier-low' : ''}`, style: `--rc:${rgb};--glow:${c.glow[0]};--glow2:${c.glow[1]}` });
   el.innerHTML = `
     <div class="op-dim"></div>
@@ -74,23 +78,28 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
       <div class="op-case"><img class="op-body" src="${art}" alt=""><img class="op-lid" src="${art}" alt=""></div>
     </div>
     <div class="op-reel">
+      <div class="op-track"><i></i></div>
       <div class="op-land"></div>
       <div class="op-win"><div class="op-strip">
         <div class="op-row op-sharp">${items.map((p) => tileHtml(p)).join('')}</div>
         ${tier === 'low' ? '' : `<div class="op-row op-blur" aria-hidden="true">${items.map((p) => tileHtml(p, true)).join('')}</div>`}
       </div></div>
-      <div class="op-marker"><b></b><i></i><i></i></div>
+      <div class="op-lens"><i class="ln-glow"></i><i class="ln-c tl"></i><i class="ln-c tr"></i><i class="ln-c bl"></i><i class="ln-c br"></i><i class="ln-chev up"></i><i class="ln-chev dn"></i><i class="ln-hair"></i></div>
       <div class="op-near">${t('case.nearMiss')}</div>
     </div>
     <div class="op-reveal">
       <div class="op-burst"></div>
       <div class="op-rays2"></div>
       <div class="op-title">${rank === 4 ? t('result.mythic') : t('result.legendary')}</div>
+      <div class="op-aura"></div>
+      <div class="op-twinkle">${Array.from({ length: 10 }, (_, i) => `<i style="--i:${i}"></i>`).join('')}</div>
       <div class="op-card">
+        <i class="op-card-frame"></i>
         <div class="op-card-ico">${prizeIcon(prize)}</div>
         <div class="op-card-r">${rarityName(prize)}</div>
         <div class="op-card-n">${prizeName(prize)}</div>
-        <div class="op-card-v">${fmt(prize.value)}${starIcon('star-ico')}</div>
+        <div class="op-card-v"><span class="op-card-num">0</span>${starIcon('star-ico')}</div>
+        <div class="op-chips"><span class="op-chip">${t('result.chance')} <b>${chanceTxt}</b></span><span class="op-chip">${t('result.case')} <b>${caseNameTxt}</b></span></div>
       </div>
     </div>
     <div class="op-flash"></div>
@@ -101,7 +110,7 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
   const $ = <T extends Element = HTMLElement>(s: string) => el.querySelector(s) as unknown as T;
   const stage = $('.op-stage'), glow = $('.op-glow'), caseEl = $('.op-case'), lid = $('.op-lid'), body = $('.op-body');
   const rays = $('.op-rays'), flash = $('.op-flash'), reel = $('.op-reel'), win = $('.op-win'), strip = $('.op-strip');
-  const sharp = $('.op-sharp'), blur = el.querySelector<HTMLElement>('.op-blur'), marker = $('.op-marker'), near = $('.op-near');
+  const sharp = $('.op-sharp'), blur = el.querySelector<HTMLElement>('.op-blur'), lens = $('.op-lens'), near = $('.op-near');
   const tint = $('.op-tint'), land = $('.op-land');
   const reveal = $('.op-reveal'), skipBtn = $('.op-skip'), canvas = $<HTMLCanvasElement>('.op-confetti'), vignette = $('.op-vignette');
   const perch = createPerch({ cls: 'op-perch' });
@@ -206,21 +215,13 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
         if (Math.abs(o - lastTint) < 0.04) return;
         lastTint = o; tint.style.opacity = o.toFixed(2);
       };
-      // coverflow depth: centre cell dominant, neighbours smaller, tilted toward centre, dimmer
+      // classic flat strip; only the rarity glow under each cell brightens near the lens (opacity only)
       const depth = () => {
-        const c = (cx - x - TILE / 2) / STEP; // fractional index under the needle
-        const lo = Math.max(0, Math.floor(c) - 3), hi = Math.min(N - 1, Math.ceil(c) + 3);
-        touched.forEach((i) => { if (i < lo || i > hi) { tiles[i].style.transform = ''; tiles[i].style.opacity = ''; if (btiles) btiles[i].style.transform = ''; glows[i].style.opacity = ''; touched.delete(i); } });
-        for (let i = lo; i <= hi; i++) {
-          const d = i - c, a = Math.min(1, Math.abs(d));
-          const sc = 1.1 - 0.24 * a - 0.04 * Math.max(0, Math.abs(d) - 1);
-          const tr = rich ? `perspective(700px) rotateY(${(-Math.sign(d) * a * 24).toFixed(1)}deg) scale(${sc.toFixed(3)})` : `scale(${sc.toFixed(3)})`;
-          tiles[i].style.transform = tr;
-          tiles[i].style.opacity = (1 - 0.42 * Math.min(1, Math.abs(d) / 1.6)).toFixed(2);
-          if (btiles) btiles[i].style.transform = tr;
-          if (rich) glows[i].style.opacity = Math.max(0, 1 - Math.abs(d) * 1.2).toFixed(2);
-          touched.add(i);
-        }
+        if (!rich) return;
+        const c = (cx - x - TILE / 2) / STEP;
+        const lo = Math.max(0, Math.floor(c) - 2), hi = Math.min(N - 1, Math.ceil(c) + 2);
+        touched.forEach((i) => { if (i < lo || i > hi) { glows[i].style.opacity = ''; touched.delete(i); } });
+        for (let i = lo; i <= hi; i++) { glows[i].style.opacity = Math.max(0.25, 1 - Math.abs(i - c) * 1.1).toFixed(2); touched.add(i); }
       };
       const tick = (now: number, v: number) => {
         const idx = Math.floor((cx - x + GAP / 2) / STEP);
@@ -233,9 +234,6 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
         sfx.tick(sp);
         perch.flick(sp);
         tg.haptic.select();
-        const amp = 5 + (1 - sp) * 9; // slow = each peg kicks the needle harder
-        marker.animate([{ transform: 'rotate(0deg)' }, { transform: `rotate(${-amp}deg)`, offset: 0.25 }, { transform: `rotate(${amp * 0.35}deg)`, offset: 0.62 }, { transform: 'rotate(0deg)' }],
-          { duration: 160 + (1 - sp) * 140, easing: 'ease-out' });
       };
       const frame = (now: number) => {
         let p: number, v = 0;
@@ -249,7 +247,7 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
           const e = 1 - Math.pow(1 - p, kk);
           x = from + dist * e;
           v = (kk * Math.pow(1 - p, kk - 1) * dist) / (dur / 1000);
-          if (!riserOn && mode === 'main' && dur - (now - t0) < 1700 && !reducedMotion) { riserOn = true; stopRiser = sfx.riser(1.7); perch.setMood('lean'); if (!spoke) spoke = perch.say('slow', 0.3); }
+          if (!riserOn && mode === 'main' && dur - (now - t0) < 1700 && !reducedMotion) { riserOn = true; stopRiser = sfx.riser(1.7); perch.setMood('lean'); el.classList.add('is-slow'); if (!spoke) spoke = perch.say('slow', 0.3); }
         }
         strip.style.transform = `translate3d(${x.toFixed(1)}px,0,0)`;
         depth();
@@ -292,6 +290,7 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
     // rarity flash under the needle + the room takes the rarity colour
     anim(land, [{ opacity: 0, transform: 'scale(.5)' }, { opacity: 1, transform: 'scale(1.05)', offset: 0.3 }, { opacity: 0.55, transform: 'scale(1.25)' }], { duration: 700, easing: 'cubic-bezier(.2,.8,.3,1)' });
     el.classList.add('is-landed');
+    anim(lens, [{ transform: 'scale(1.1)' }, { transform: 'scale(.97)', offset: 0.45 }, { transform: 'scale(1)' }], { duration: 620, easing: 'cubic-bezier(.34,1.56,.64,1)', fill: 'none' });
     if (nearMiss) { perch.setMood('gasp'); perch.say('near', 0.8); }
     else if (!epicMoment) { perch.setMood(rank === 0 ? 'meh' : 'happy'); perch.say(rank === 0 ? 'common' : 'good', rank === 0 ? 0.45 : 0.6); }
     if (nearMiss) {
@@ -304,7 +303,7 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
       // slow-mo: darken the world, two heartbeats on the winner, then white flash
       anim(vignette, [{ opacity: 0 }, { opacity: 1 }], { duration: 500, easing: 'ease-in' });
       for (let i = 0; i < 2; i++) {
-        tiles[WIN].animate([{ transform: 'scale(1.16)' }, { transform: 'scale(1.28)', offset: 0.3 }, { transform: 'scale(1.16)' }], { duration: 480, easing: 'ease-out' });
+        tiles[WIN].animate([{ transform: 'scale(1.06)' }, { transform: 'scale(1.16)', offset: 0.3 }, { transform: 'scale(1.06)' }], { duration: 480, easing: 'ease-out' });
         tg.haptic.heavy();
         await wait(520);
       }
@@ -313,6 +312,13 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
 
   // ── phase 5: reveal ──
   async function doReveal() {
+    // ghost leaps down to the right of / below the prize card (card: 34% centre, ~276px tall)
+    {
+      const W = el.clientWidth, H = el.clientHeight, g = perch.el.querySelector('.pc-ghost')!.getBoundingClientRect(), o = el.getBoundingClientRect();
+      const targetTop = H * 0.34 + 166, targetLeft = W - g.width - 6;
+      perch.el.style.setProperty('--aside', `${Math.round(targetLeft - (g.left - o.left))}px`);
+      perch.el.style.setProperty('--drop', `${Math.round(targetTop - (g.top - o.top))}px`);
+    }
     el.classList.add('is-reveal');
     anim(reel, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(1.06)' }], { duration: 320, easing: 'ease-in' });
     anim(skipBtn, [{ opacity: 1 }, { opacity: 0 }], { duration: 200 });
@@ -331,6 +337,9 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
     anim(el.querySelector('.op-burst')!, [{ transform: 'scale(.2)', opacity: 1 }, { transform: `scale(${epicMoment ? 2.4 : 1.8})`, opacity: 0 }], { duration: epicMoment ? 1100 : 800, easing: 'cubic-bezier(.1,.7,.3,1)' });
     anim(el.querySelector('.op-rays2')!, [{ opacity: 0, transform: 'scale(.5)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 700, easing: 'cubic-bezier(.22,1,.36,1)' });
     anim(el.querySelector('.op-card')!, [{ opacity: 0, transform: 'translateY(40px) scale(.4)' }, { opacity: 1, transform: 'none' }], { duration: 900, delay: epicMoment ? 260 : 80, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+    countTo(el.querySelector<HTMLElement>('.op-card-num')!, 0, prize.value, (n) => fmt(n), epicMoment ? 1300 : 900);
+    anim(el.querySelector('.op-aura')!, [{ opacity: 0, transform: 'scale(.4)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 900, easing: 'cubic-bezier(.22,1,.36,1)' });
+    anim(el.querySelector('.op-chips')!, [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 500, delay: epicMoment ? 700 : 450, easing: 'ease-out' });
     anim(el.querySelector('.op-card-ico')!, [{ transform: 'scale(.6) rotate(-12deg)' }, { transform: 'scale(1.12, .9) rotate(4deg)', offset: 0.45 }, { transform: 'none' }], { duration: 1000, delay: epicMoment ? 300 : 120, easing: 'cubic-bezier(.34,1.4,.64,1)' });
     if (!reducedMotion) {
       const palette = ['#3fe3ff', '#9d6bff', '#ff4fc8', '#ffffff', `rgb(${rgb})`];
@@ -345,10 +354,10 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
     const H = el.clientHeight;
     const probe = h('div', { style: 'position:absolute;top:var(--safe-top);height:0' }); el.append(probe);
     const safe = probe.offsetTop; probe.remove();
-    const branch = H * 0.38 - TILE * 0.62 - 22;             // y of the branch line
-    const pm = Math.round(Math.max(50, Math.min(84, (branch - safe - 8) / 0.92)));
+    const line = Math.min(H * 0.36 - 103 - 38, H * 0.38 - TILE * 0.56 - 60); // bough top edge: above the case art and the reel
+    const pm = Math.round(Math.max(56, Math.min(92, (line - safe - 6) / 0.92)));
     perch.el.style.setProperty('--pm', `${pm}px`);
-    perch.el.style.top = `${branch + 38 - (pm + 40)}px`;    // branch top edge sits 38px above the perch bottom
+    perch.el.style.top = `${line - pm + 2}px`;
   }
 
   return {
@@ -357,7 +366,7 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
     skip,
     async run() {
       // responsive cells: ~3 visible on 360–430 px screens, centre one dominant
-      TILE = Math.round(Math.min(156, Math.max(124, win.clientWidth * 0.36)));
+      TILE = Math.round(Math.min(126, Math.max(108, win.clientWidth * 0.295)));
       STEP = TILE + GAP;
       el.style.setProperty('--tile', `${TILE}px`);
       layoutPerch();
