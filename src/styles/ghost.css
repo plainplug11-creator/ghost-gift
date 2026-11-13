@@ -1,29 +1,37 @@
 /* ═════════ Layered mascot (src/ui/ghost.ts). transform/opacity only; .is-lite = still ═════════ */
 .gh { position: absolute; inset: 0; pointer-events: none; }
-.gh-float, .gh-sq, .gh-back, .gh-sps { position: absolute; inset: 0; }
+.gh-float, .gh-turn, .gh-act, .gh-sq, .gh-sqx, .gh-back, .gh-sps { position: absolute; inset: 0; }
 .gh-float { transform-origin: 50% 70%; }
-.gh-sq { transform-origin: 50% 93%; }
+.gh-turn { transform-origin: 50% 88%; transition: transform 0.75s cubic-bezier(.34,1.45,.64,1); }
+.gh-act { transform-origin: 50% 80%; }
+.gh-sq, .gh-sqx { transform-origin: 50% 93%; }
+.gh-lw { position: absolute; }
+.gh-starw { position: absolute; }
 .gh-l, .gh-star img, .gh-sp img { position: absolute; display: block; -webkit-user-drag: none; user-select: none; }
 .gh-star img, .gh-sp img { inset: 0; width: 100%; height: 100%; }
 .gh-core { filter: drop-shadow(0 6px 10px rgba(6, 4, 30, 0.45)); }
 .gh.is-mini .gh-core { filter: none; }
-.gh-eyes { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.gh-eyes g { transform-box: fill-box; transform-origin: center; }
+.gh-eyes, .ge-look { position: absolute; inset: 0; }
+.ge-eye { position: absolute; }
+.ge-lid, .ge-x, .ge-s, .ge-star { position: absolute; inset: 0; transform-origin: 50% 50%; }
+.ge-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.ge-halo { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 122, 217, 0.7), rgba(182, 92, 255, 0.32) 45%, rgba(122, 60, 255, 0)); }
 .ge-look { transition: transform 0.38s cubic-bezier(.22,1,.36,1); }
 .ge-s { transition: transform 0.3s cubic-bezier(.34,1.56,.64,1); }
 .ge-open, .ge-hap, .ge-star { transition: opacity 0.16s ease; }
 .ge-hap, .ge-star { opacity: 0; }
 .ge-halo { opacity: 0.85; }
-.gh-star { position: absolute; }
+.gh-star { position: absolute; inset: 0; }
 .gh-star-glow { position: absolute; inset: -18%; border-radius: 50%; opacity: 0.4;
   background: radial-gradient(closest-side, rgba(255, 255, 255, 0.75), rgba(255, 140, 230, 0.35) 45%, rgba(140, 90, 255, 0) 75%); }
 .gh-sp { position: absolute; }
 
 /* living loops (rich tiers) */
-.gh:not(.is-lite) .gh-float { animation: gh-float 4.4s ease-in-out infinite; }
-@keyframes gh-float { 0%, 100% { transform: translateY(1.5%) rotate(-2deg) skewX(1deg); } 50% { transform: translateY(-3.5%) rotate(2deg) skewX(-1.2deg); } }
-.gh:not(.is-lite) .gh-sq { animation: gh-squash 4.4s ease-in-out infinite; }
-@keyframes gh-squash { 0%, 100% { transform: scale(1.025, 0.975); } 50% { transform: scale(0.98, 1.03); } }
+.gh:not(.is-lite) .gh-float { animation: gh-float 3.8s ease-in-out infinite; }
+@keyframes gh-float { 0%, 100% { transform: translateY(2.5%) rotate(-3.5deg) skewX(1.6deg); } 50% { transform: translateY(-6%) rotate(3.5deg) skewX(-2deg); } }
+.gh:not(.is-lite) .gh-sq { animation: gh-squash 3.8s ease-in-out infinite; }
+@keyframes gh-squash { 0%, 100% { transform: scale(1.05, 0.95); } 50% { transform: scale(0.965, 1.05); } }
 .gh:not(.is-lite) .gh-ringL { animation: gh-ringL 7s ease-in-out infinite; }
 .gh:not(.is-lite) .gh-ringR { animation: gh-ringR 6.2s ease-in-out -2s infinite; }
 @keyframes gh-ringL { 0%, 100% { transform: rotate(-2.2deg) scale(0.99); } 50% { transform: rotate(2.4deg) scale(1.035); } }
@@ -31,9 +39,9 @@
 .gh:not(.is-lite) .gh-armL { animation: gh-armL 2.9s ease-in-out infinite; }
 .gh:not(.is-lite) .gh-armR { animation: gh-armR 3.3s ease-in-out -0.9s infinite; }
 .gh:not(.is-lite) .gh-tail { animation: gh-tail 3.7s ease-in-out -1.2s infinite; }
-@keyframes gh-armL { 0%, 100% { transform: rotate(4deg); } 50% { transform: rotate(-5deg); } }
-@keyframes gh-armR { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(5deg); } }
-@keyframes gh-tail { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(6deg); } }
+@keyframes gh-armL { 0%, 100% { transform: rotate(7deg); } 50% { transform: rotate(-7deg); } }
+@keyframes gh-armR { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(7deg); } }
+@keyframes gh-tail { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(9deg); } }
 .gh:not(.is-lite) .gh-star { animation: gh-star 2.8s ease-in-out infinite; }
 .gh:not(.is-lite) .gh-star-glow { animation: gh-star-glow 2.8s ease-in-out infinite; }
 @keyframes gh-star { 0%, 100% { transform: scale(1) rotate(0deg); } 50% { transform: scale(1.07) rotate(-4deg); } }
@@ -41,10 +49,10 @@
 .gh:not(.is-lite) .ge-lid { animation: ge-blink 4.8s ease-in-out infinite; }
 @keyframes ge-blink { 0%, 91%, 97.5%, 100% { transform: none; } 94% { transform: scaleY(0.08); } }
 .gh:not(.is-lite) .ge-halo { animation: ge-glow 2.2s ease-in-out infinite; }
-@keyframes ge-glow { 50% { opacity: 0.45; } }
+@keyframes ge-glow { 0%, 100% { opacity: 0.85; } 50% { opacity: 0.45; } }
 /* sparkles trail the body: same float, half a second late, plus their own twinkle */
-.gh:not(.is-lite) .gh-sps { animation: gh-trail 4.4s ease-in-out -3.85s infinite; }
-@keyframes gh-trail { 0%, 100% { transform: translate(-1%, 2.5%) rotate(-1.5deg); } 50% { transform: translate(1%, -5%) rotate(1.5deg); } }
+.gh:not(.is-lite) .gh-sps { animation: gh-trail 3.8s ease-in-out -3.3s infinite; }
+@keyframes gh-trail { 0%, 100% { transform: translate(-1.5%, 3.5%) rotate(-2.5deg); } 50% { transform: translate(1.5%, -7%) rotate(2.5deg); } }
 .gh:not(.is-lite) .gh-sp { animation: gh-tw var(--d, 2.6s) ease-in-out var(--dl, 0s) infinite; }
 @keyframes gh-tw { 0%, 100% { transform: scale(0.72) rotate(-8deg); opacity: 0.55; } 45% { transform: scale(1.12) rotate(10deg); opacity: 1; } 60% { transform: scale(1) rotate(6deg); opacity: 0.95; } }
 
@@ -72,5 +80,4 @@
 @keyframes ge-starspin { 50% { transform: scale(1.18) rotate(20deg); } }
 .gh[data-mood="happy"] .ge-lid, .gh[data-mood="ecstatic"] .ge-lid, .gh[data-mood="gasp"] .ge-lid { animation: none; }
 .gh[data-mood="ecstatic"] .gh-star-glow { opacity: 0.95; }
-.gh:not(.is-lite)[data-mood="lean"] .gh-float { animation-duration: 2.6s; }
 .gh:not(.is-lite)[data-mood="ecstatic"] .gh-sp { animation-duration: 1.1s; }

@@ -48,7 +48,7 @@ export function createProfile() {
   const menu = h('div', { class: 'menu glass' }, invRow, rulesRow, sndRow);
 
   const ghosts = h('div', { class: 'ghost-row' });
-  for (let i = 0; i < 5; i++) ghosts.append(html(`<span class="mini-ghost${i ? ' is-locked' : ''}"><img src="${MASCOT_URL}" alt="" draggable="false"></span>`));
+  for (let i = 0; i < 5; i++) ghosts.append(html(`<span class="mini-ghost${i ? ' is-locked' : ''}"><img src="${MASCOT_URL}" alt="" loading="lazy" decoding="async" draggable="false"></span>`));
   const collection = h('div', { class: 'collection glass' },
     h('div', { class: 'collection-head' },
       h('span', { class: 'collection-title' }, t('profile.collection')),

@@ -94,7 +94,7 @@ export interface Perch {
   destroy(): void;
 }
 
-export function createPerch(opts: { cls?: string; size?: number; bubble?: boolean; pos?: number } = {}): Perch {
+export function createPerch(opts: { cls?: string; size?: number; bubble?: boolean; pos?: number; antics?: boolean } = {}): Perch {
   const lite = tier === 'low' || reducedMotion;
   const el = h('div', { class: `perch ${opts.cls ?? ''}${lite ? ' is-lite' : ''}`, 'data-mood': 'idle' });
   if (opts.size) el.style.setProperty('--pm', `${opts.size}px`);
@@ -106,8 +106,9 @@ export function createPerch(opts: { cls?: string; size?: number; bubble?: boolea
     <div class="pc-sparks">${Array.from({ length: 7 }, (_, i) => `<i style="--k:${i}"></i>`).join('')}</div>
     ${opts.bubble === false ? '' : '<div class="pc-bubble glass"><span></span></div>'}</div>`;
   const $ = (s: string) => el.querySelector(s) as HTMLElement;
-  const ghost = $('.pc-ghost'), body = $('.pc-body');
+  const ghost = $('.pc-ghost');
   const gh = createGhost();
+  if (opts.antics === false) gh.antics(false);
   $('.pc-inner').append(gh.el);
   const bubble = el.querySelector<HTMLElement>('.pc-bubble'), btext = bubble?.querySelector('span');
   let mood: Mood = 'idle', spoken = 0, bubbleT = 0;
@@ -132,27 +133,21 @@ export function createPerch(opts: { cls?: string; size?: number; bubble?: boolea
     if (m === mood && m !== 'happy' && m !== 'ecstatic') return;
     mood = m; el.dataset.mood = m; gh.setMood(m);
     switch (m) {
-      case 'idle': lookAt(-6, 5); break;
-      case 'watch': lookAt(-8, 8); break;
-      case 'lean': lookAt(-9, 9); break;
+      case 'idle': lookAt(6, 5); break;
+      case 'watch': lookAt(8, 8); break;
+      case 'lean': lookAt(9, 9); break;
       case 'gasp':
-        lookAt(-6, 4);
-        anim(body, [{ transform: 'none' }, { transform: 'translate(3px,-6px) scale(1.06,.95) rotate(4deg)', offset: 0.25 }, { transform: 'translate(2px,-2px) rotate(2deg)' }], { duration: 420, easing: 'cubic-bezier(.3,1.6,.5,1)', fill: 'forwards' });
+        lookAt(6, 4);
         break;
       case 'meh':
-        lookAt(-2, 3);
-        anim(body, [{ transform: 'none' }, { transform: 'translateY(-3px) rotate(-7deg)', offset: 0.3 }, { transform: 'translateY(-3px) rotate(6deg)', offset: 0.65 }, { transform: 'none' }], { duration: 900, easing: 'ease-in-out' });
+        lookAt(2, 3);
         break;
       case 'happy':
-        lookAt(-3, 2);
-        anim(body, [{ transform: 'none' }, { transform: 'translateY(-12px) scale(.96,1.05)', offset: 0.3 }, { transform: 'translateY(0) scale(1.06,.93)', offset: 0.55 }, { transform: 'translateY(-6px)', offset: 0.75 }, { transform: 'none' }], { duration: 800, easing: 'ease-out' });
+        lookAt(3, 2);
         sparks(3);
         break;
       case 'ecstatic': {
         lookAt(0, -2);
-        const j = (dy: number, r: number) => ({ transform: `translateY(${dy}px) rotate(${r}deg) scale(.95,1.06)` });
-        anim(body, [{ transform: 'none' }, j(-18, -8), { transform: 'scale(1.08,.9)', offset: 0.33 }, j(-16, 8), { transform: 'scale(1.06,.92)', offset: 0.66 }, j(-10, 0), { transform: 'none' }],
-          { duration: 1300, easing: 'ease-in-out' });
         anim(el.querySelector('.pc-bough')!, [{ transform: 'none' }, { transform: 'rotate(1.6deg)', offset: 0.36 }, { transform: 'rotate(-1deg)', offset: 0.6 }, { transform: 'none' }], { duration: 1300, easing: 'ease-in-out' });
         sparks(7); later(() => sparks(5), 650);
         if (!lite) { const l2 = $('.pc-leaf.l2'), b = `rotate(${l2.dataset.r}deg) scale(${l2.dataset.s})`; anim(l2, [{ transform: b, opacity: 1 }, { transform: `translate(-30px,170px) ${b} rotate(260deg)`, opacity: 0 }], { duration: 2200, delay: 250, easing: 'cubic-bezier(.4,.1,.6,1)', fill: 'forwards' }); }
@@ -177,7 +172,7 @@ export function createPerch(opts: { cls?: string; size?: number; bubble?: boolea
     return true;
   }
 
-  function hop() { gh.pop(); anim(body, [{ transform: 'none' }, { transform: 'translateY(-10px) scale(.96,1.05)', offset: 0.35 }, { transform: 'scale(1.05,.94)', offset: 0.65 }, { transform: 'none' }], { duration: 560, easing: 'ease-out' }); }
+  function hop() { gh.hop(); gh.pop(); }
 
   ghost.addEventListener('click', () => { hop(); });
   // now and then a leaf lets go and drifts down (rich tiers only)
@@ -209,6 +204,6 @@ export function createPerch(opts: { cls?: string; size?: number; bubble?: boolea
       later(() => { lf.getAnimations().forEach((a) => a.cancel()); lf.animate([{ transform: `${base} scale(.2)`, opacity: 0 }, { transform: base, opacity: 1 }], { duration: 700, easing: 'cubic-bezier(.34,1.56,.64,1)' }); lf.classList.remove('is-gone'); }, 5200 + k * 400);
     }
   }
-  lookAt(-6, 5);
-  return { el, setMood, lookAt, flick, say, hop, gust, destroy() { timers.forEach(clearTimeout); clearTimeout(bubbleT); clearTimeout(fallT); clearTimeout(gustT); } };
+  lookAt(6, 5);
+  return { el, setMood, lookAt, flick, say, hop, gust, destroy() { gh.destroy(); timers.forEach(clearTimeout); clearTimeout(bubbleT); clearTimeout(fallT); clearTimeout(gustT); } };
 }

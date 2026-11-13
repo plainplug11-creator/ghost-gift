@@ -45,9 +45,12 @@ export function createCase(id: string): Page {
   // header: our ghost on an autumn branch, looking down at the case; tap = hop
   const perch = createPerch({ bubble: false });
   hero.prepend(perch.el);
-  perch.lookAt(-8, 7);
+  perch.lookAt(8, 7);
   perch.el.querySelector('.pc-ghost')!.addEventListener('click', () => tg.haptic.soft());
-  const glance = window.setInterval(() => { perch.lookAt(-1, 1); setTimeout(() => perch.lookAt(-8, 7), 1300); }, 6500);
+  // hero scrolled away → its loops (branch leaves, ghost, rays) pause
+  const heroIO = 'IntersectionObserver' in window ? new IntersectionObserver(([e]) => hero.classList.toggle('is-idle', !e.isIntersecting)) : null;
+  heroIO?.observe(hero);
+  const glance = window.setInterval(() => { perch.lookAt(1, 1); setTimeout(() => perch.lookAt(8, 7), 1300); }, 6500);
 
   // ── actions ──
   const openBtn = h('button', { class: 'btn-primary cd-open', 'data-press': '' });
@@ -200,6 +203,6 @@ export function createCase(id: string): Page {
     el,
     // Back during the show = fast-forward (never leave mid-opening)
     onBack() { if (opening) { opening.skip(); return false; } },
-    destroy() { clearInterval(glance); perch.destroy(); clearTimeout(timer); unBal(); unDaily(); bal.unsub(); snd.unsub(); },
+    destroy() { heroIO?.disconnect(); clearInterval(glance); perch.destroy(); clearTimeout(timer); unBal(); unDaily(); bal.unsub(); snd.unsub(); },
   };
 }

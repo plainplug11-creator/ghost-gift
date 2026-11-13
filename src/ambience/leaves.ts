@@ -73,12 +73,14 @@ export function mountLeaves(canvas: HTMLCanvasElement) {
   const motes = ['63,227,255', '157,107,255', '255,79,200'].map((c) => emberSprite(c));
   const N = tier === 'low' ? 4 : tier === 'mid' ? 7 : 9;
   const E = tier === 'low' ? 3 : 6;
-  const frameMin = tier === 'low' ? 1000 / 31 : 0;
+  // ~30 fps for the whole ambient layer: motion here is slow drift (≤ 1 px per frame), so half the frames look the
+  // same — and every rAF tick also makes the browser service all running CSS animations on the main thread.
+  const frameMin = 1000 / 31;
   // fireflies + glints fill the empty space on rich tiers only
   const F = tier === 'high' ? 12 : tier === 'mid' ? 8 : 0;
   const glints = tier === 'low' ? [] : ['159,243,255', '255,158,224', '201,166,255'].map((c) => glintSprite(c));
   let flies: Fly[] = [], gl: Glint[] = [], nextGlint = 1.2;
-  let W = 0, H = 0, dpr = 1, raf = 0, last = 0, acc = 0;
+  let W = 0, H = 0, dpr = 1, raf = 0, last = 0;
 
   const rnd = (a: number, b: number) => a + Math.random() * (b - a);
   const newLeaf = (initial: boolean): Leaf => {
@@ -157,15 +159,16 @@ export function mountLeaves(canvas: HTMLCanvasElement) {
     ctx.globalAlpha = 1;
   };
 
+  // timer-paced: request a frame only when one is due (a rAF loop that skips frames still costs a main frame each vsync)
+  let tmo = 0;
   const frame = (now: number) => {
-    raf = requestAnimationFrame(frame);
-    const dt = Math.min(0.05, (now - last) / 1000);
-    acc += now - last; last = now;
-    if (acc < frameMin) return;
-    draw(frameMin ? acc / 1000 : dt); acc = 0;
+    raf = 0;
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    draw(dt);
+    tmo = window.setTimeout(() => { tmo = 0; raf = requestAnimationFrame(frame); }, Math.max(0, frameMin - (performance.now() - now) - 4));
   };
-  const start = () => { if (!raf && !reducedMotion && isRunning()) { last = performance.now(); raf = requestAnimationFrame(frame); } };
-  const stop = () => { cancelAnimationFrame(raf); raf = 0; };
+  const start = () => { if (!raf && !tmo && !reducedMotion && isRunning()) { last = performance.now(); raf = requestAnimationFrame(frame); } };
+  const stop = () => { cancelAnimationFrame(raf); clearTimeout(tmo); raf = 0; tmo = 0; };
 
   addEventListener('resize', resize, { passive: true });
   onRunningChange((r) => (r ? start() : stop()));

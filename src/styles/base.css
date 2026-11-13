@@ -59,7 +59,10 @@ h1, h2 { font-weight: inherit; }
 
 /* Global animation pause (hidden tab / Telegram deactivated / off-screen screen) */
 .is-paused *, .is-paused *::before, .is-paused *::after,
-.is-idle *, .is-idle *::before, .is-idle *::after { animation-play-state: paused !important; }
+.is-idle *, .is-idle *::before, .is-idle *::after,
+/* screens that can't be seen: a page covered by a pushed page, the case page under the opening show */
+.app.is-covered *, .sheet.is-covered *, .app.is-covered *::before, .sheet.is-covered *::before, .app.is-covered *::after, .sheet.is-covered *::after,
+.is-opening > :not(.op), .is-opening > :not(.op) *, .is-opening > :not(.op) *::before, .is-opening > :not(.op) *::after { animation-play-state: paused !important; }
 
 /* Reduced motion: kill decorative loops, keep functional fades */
 @media (prefers-reduced-motion: reduce) {

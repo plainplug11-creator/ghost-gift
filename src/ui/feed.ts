@@ -5,10 +5,11 @@ import type { JellyIcon } from '../art/icon-names';
 import { isRunning, onRunningChange, reducedMotion } from '../core/perf';
 
 /**
- * Live wins feed — a JS-driven, recycling marquee.
+ * Live wins feed — a recycling marquee.
  *  - Only ~6–8 chips exist in the DOM at any time (chips leaving on the left are
  *    removed, new ones are appended on the right) → constant memory, cheap layout.
- *  - Movement is a single translate3d on the track (compositor only).
+ *  - Movement is a single translate3d on the track, run as WAAPI segments (one chip width each) on the
+ *    compositor — JS only wakes up between segments to recycle chips, so there is no per-frame rAF work.
  *  - Touch: eases to a stop, lets you drag/scrub, then eases back to speed.
  *  - New wins (mock generator now, WebSocket later) are queued and enter next.
  */
@@ -67,8 +68,9 @@ export function createFeed() {
   const pool: Win[] = Array.from({ length: 14 }, mockWin); // seamless loop source
   let poolIdx = 0;
 
-  let x = 0, v = reducedMotion ? 0 : SPEED, target = v;
-  let viewW = 0, raf = 0, last = 0, held = false, dragX = 0, resumeT = 0, active = true;
+  let x = 0;
+  let viewW = 0, held = false, dragX = 0, resumeT = 0, active = true;
+  let seg: Animation | null = null, segDist = 0;
 
   const measure = (n: Node) => (n.w = n.el.offsetWidth);
   const totalW = () => nodes.reduce((s, n) => s + n.w + GAP, 0);
@@ -82,7 +84,7 @@ export function createFeed() {
     const n: Node = { el: chip(d, fresh), w: 0, data: d };
     track.append(n.el); measure(n); nodes.push(n);
   };
-  const fill = () => { while (x + totalW() < viewW + 160) append(); };
+  const fill = () => { while (x + totalW() < viewW + 320) append(); };
 
   const render = () => { track.style.transform = `translate3d(${x.toFixed(2)}px,0,0)`; };
 
@@ -102,31 +104,38 @@ export function createFeed() {
     if (x > 0) x = 0;
     fill();
     // trim right side to keep DOM small
-    while (nodes.length > 2 && x + totalW() - (nodes[nodes.length - 1].w + GAP) > viewW + 360) nodes.pop()!.el.remove();
+    while (nodes.length > 2 && x + totalW() - (nodes[nodes.length - 1].w + GAP) > viewW + 480) nodes.pop()!.el.remove();
   };
 
-  const frame = (now: number) => {
-    const dt = Math.min(0.05, (now - last) / 1000); last = now;
-    if (!held && resumeT && now > resumeT) { target = reducedMotion ? 0 : SPEED; resumeT = 0; }
-    v += (target - v) * Math.min(1, dt * 4); // critically-damped-ish ease to target speed
-    if (!held) x -= v * dt;
+  const curX = () => { try { return new DOMMatrixReadOnly(getComputedStyle(track).transform).m41; } catch { return x; } };
+  /** one compositor segment: until the first chip has fully left (ramp = ease up from standstill after a touch) */
+  const runSeg = (ramp = false) => {
+    if (seg || held || !active || reducedMotion || !isRunning() || !nodes.length) return;
     recycle(); render();
-    raf = requestAnimationFrame(frame);
+    let dist = x + nodes[0].w + GAP;
+    if (dist < 2) dist = nodes[0].w + GAP;
+    if (ramp) dist = Math.min(dist, 34);
+    segDist = dist;
+    const dur = ((ramp ? 2 : 1) * dist / SPEED) * 1000;
+    const a = track.animate([{ transform: `translate3d(${x.toFixed(2)}px,0,0)` }, { transform: `translate3d(${(x - dist).toFixed(2)}px,0,0)` }],
+      { duration: dur, easing: ramp ? 'cubic-bezier(.5,0,.75,.5)' : 'linear', fill: 'forwards' });
+    seg = a;
+    a.onfinish = () => { if (seg !== a) return; x -= segDist; seg = null; render(); a.cancel(); runSeg(); };
   };
-  const start = () => { if (!raf && active && isRunning()) { last = performance.now(); raf = requestAnimationFrame(frame); } };
-  const stop = () => { cancelAnimationFrame(raf); raf = 0; };
+  const start = (ramp = false) => runSeg(ramp);
+  const stop = () => { if (!seg) return; const a = seg; seg = null; x = curX(); render(); a.cancel(); };
 
   // touch: hold to pause, drag to scrub
   root.addEventListener('pointerdown', (e) => {
-    held = true; target = 0; v = 0; dragX = e.clientX; resumeT = 0;
+    held = true; stop(); clearTimeout(resumeT); dragX = e.clientX;
     root.setPointerCapture(e.pointerId);
   });
   root.addEventListener('pointermove', (e) => {
     if (!held) return;
     x += e.clientX - dragX; dragX = e.clientX;
-    if (!raf) { recycle(); render(); }
+    recycle(); render();
   });
-  const up = () => { if (!held) return; held = false; resumeT = performance.now() + 900; };
+  const up = () => { if (!held) return; held = false; clearTimeout(resumeT); resumeT = window.setTimeout(() => start(true), 900); };
   root.addEventListener('pointerup', up);
   root.addEventListener('pointercancel', up);
 
@@ -138,7 +147,7 @@ export function createFeed() {
 
   const ro = new ResizeObserver(() => { viewW = root.clientWidth; nodes.forEach(measure); fill(); render(); });
 
-  onRunningChange((r) => (r ? start() : stop()));
+  onRunningChange((r) => (r ? start(true) : stop()));
 
   return {
     el: root,
@@ -146,9 +155,9 @@ export function createFeed() {
       viewW = root.clientWidth; fill(); render(); ro.observe(root);
       schedule(); start();
     },
-    setActive(a: boolean) { active = a; a ? start() : stop(); },
+    setActive(a: boolean) { active = a; a ? start(true) : stop(); },
     /** Real-time win (own or from the server stream) → jumps the queue. */
     push(w: Win) { queue.unshift(w); },
-    destroy() { stop(); clearTimeout(timer); ro.disconnect(); },
+    destroy() { stop(); clearTimeout(timer); clearTimeout(resumeT); ro.disconnect(); },
   };
 }

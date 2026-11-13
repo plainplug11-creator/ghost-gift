@@ -37,6 +37,64 @@ function weightedPick(c: CaseDef) {
   return PRIZES[c.drops[0].prize];
 }
 
+/* ── the "deck": fills the empty stage under the reel while it spins ──
+ * centre: neon portal with the case's top prize + odds by rarity; sides: neon vines with
+ * twinkling bulbs and slow spotlight sweeps. All CSS transform/opacity loops; static on tier-low. */
+type Pt = [number, number];
+const VINE: [Pt, Pt, Pt, Pt][] = [
+  [[30, 0], [54, 34], [8, 70], [30, 108]],
+  [[30, 108], [52, 146], [10, 180], [30, 216]],
+  [[30, 216], [50, 250], [14, 284], [28, 320]],
+];
+const bez = (s: [Pt, Pt, Pt, Pt], t: number): Pt => {
+  const u = 1 - t, a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, d = t * t * t;
+  return [a * s[0][0] + b * s[1][0] + c * s[2][0] + d * s[3][0], a * s[0][1] + b * s[1][1] + c * s[2][1] + d * s[3][1]];
+};
+const VINE_D = 'M30 0' + VINE.map((s) => ` C${s[1].join(' ')} ${s[2].join(' ')} ${s[3].join(' ')}`).join('');
+const BULBS: Pt[] = VINE.flatMap((s) => [0.18, 0.5, 0.82].map((t) => bez(s, t)));
+const VLEAVES: { p: Pt; r: number; c: string }[] = [
+  { p: bez(VINE[0], 0.32), r: -40, c: '#3fe3ff' }, { p: bez(VINE[0], 0.7), r: 140, c: '#c86bff' },
+  { p: bez(VINE[1], 0.3), r: -30, c: '#ff5ccc' }, { p: bez(VINE[1], 0.68), r: 150, c: '#ff9a3c' },
+  { p: bez(VINE[2], 0.35), r: -45, c: '#8f7bff' }, { p: bez(VINE[2], 0.72), r: 135, c: '#3fe3ff' },
+];
+const BULB_C = ['#3fe3ff', '#ff5ccc', '#a77dff'];
+function vineHtml(side: 'l' | 'r') {
+  const leaf = (l: (typeof VLEAVES)[number]) =>
+    `<g transform="translate(${l.p[0].toFixed(1)} ${l.p[1].toFixed(1)}) rotate(${l.r})"><path d="M0 0 C4 -5 12 -5 16 0 C12 5 4 5 0 0Z M2 0 H13" fill="${l.c}22" stroke="${l.c}" stroke-width="1.3" stroke-linejoin="round"/></g>`;
+  const bulbs = (k: number) => BULBS.map((b, i) => (i % 2 === k ? `<i style="left:${(b[0] / 60 * 100).toFixed(2)}%;top:${(b[1] / 320 * 100).toFixed(2)}%;--bc:${BULB_C[i % 3]}"></i>` : '')).join('');
+  return `<div class="dk-vine ${side}"><svg viewBox="0 0 60 320" preserveAspectRatio="xMidYMin meet" aria-hidden="true">
+    <path d="${VINE_D}" fill="none" stroke="url(#dkv)" stroke-width="5" stroke-linecap="round" opacity=".28"/>
+    <path d="${VINE_D}" fill="none" stroke="url(#dkv)" stroke-width="1.8" stroke-linecap="round"/>
+    ${VLEAVES.map(leaf).join('')}</svg>
+    <div class="dk-bulbs b0">${bulbs(0)}</div><div class="dk-bulbs b1">${bulbs(1)}</div></div>`;
+}
+function deckHtml(c: CaseDef, best: Prize) {
+  const byR = new Map<Prize['rarity'], number>();
+  for (const r of caseStats(c).rows) byR.set(r.prize.rarity, (byR.get(r.prize.rarity) ?? 0) + r.chance);
+  const odds = [...byR.entries()].sort((a, b) => RARITY_RANK[a[0]] - RARITY_RANK[b[0]]).map(([r, ch]) => {
+    const v = ch * 100, txt = v >= 10 ? v.toFixed(0) : v >= 1 ? v.toFixed(1) : v.toFixed(2);
+    return `<span class="dk-odd" style="--oc:${RARITY_RGB[r]}" title="${t(`rarity.${r}` as Parameters<typeof t>[0])}"><i></i>${txt}%</span>`;
+  }).join('');
+  return `<div class="op-deck" aria-hidden="true">
+    <svg width="0" height="0" style="position:absolute"><defs><linearGradient id="dkv" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3fe3ff"/><stop offset=".55" stop-color="#a77dff"/><stop offset="1" stop-color="#ff5ccc" stop-opacity=".2"/></linearGradient></defs></svg>
+    <i class="dk-beam l"></i><i class="dk-beam r"></i>
+    ${vineHtml('l')}${vineHtml('r')}
+    <div class="dk-mid">
+      <div class="dk-label">${t('deck.top')}</div>
+      <div class="dk-portal" style="--bc:${RARITY_RGB[best.rarity]}">
+        <i class="dk-halo"></i><i class="dk-ring"></i><i class="dk-ring dk-ring-rc"></i>
+        <i class="dk-dial"></i>
+        <div class="dk-orbit"><i></i><i></i><i></i></div>
+        <div class="dk-motes">${Array.from({ length: 6 }, (_, i) => `<i style="--i:${i}"></i>`).join('')}</div>
+        <div class="dk-prize">${prizeIcon(best)}</div>
+      </div>
+      <div class="dk-name"><b>${prizeName(best)}</b><span>${fmt(best.value)}${starIcon('star-ico')}</span></div>
+    </div>
+    <div class="dk-odds"><span class="dk-odds-l">${t('deck.odds')}</span>${odds}</div>
+    <i class="dk-floor"></i>
+  </div>`;
+}
+
 function tileHtml(p: Prize, blur = false) {
   return blur
     ? `<div class="tile r-${p.rarity}" style="--rc:${RARITY_RGB[p.rarity]}">${prizeIcon(p)}</div>`
@@ -87,6 +145,7 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
       <div class="op-lens"><i class="ln-glow"></i><i class="ln-c tl"></i><i class="ln-c tr"></i><i class="ln-c bl"></i><i class="ln-c br"></i><i class="ln-chev up"></i><i class="ln-chev dn"></i><i class="ln-hair"></i></div>
       <div class="op-near">${t('case.nearMiss')}</div>
     </div>
+    ${deckHtml(c, best)}
     <div class="op-reveal">
       <div class="op-burst"></div>
       <div class="op-rays2"></div>
@@ -113,7 +172,7 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
   const sharp = $('.op-sharp'), blur = el.querySelector<HTMLElement>('.op-blur'), lens = $('.op-lens'), near = $('.op-near');
   const tint = $('.op-tint'), land = $('.op-land');
   const reveal = $('.op-reveal'), skipBtn = $('.op-skip'), canvas = $<HTMLCanvasElement>('.op-confetti'), vignette = $('.op-vignette');
-  const perch = createPerch({ cls: 'op-perch' });
+  const perch = createPerch({ cls: 'op-perch', antics: false });
   vignette.after(perch.el);
   /** point the ghost's eyes at a screen point */
   const aim = (px: number, py: number) => {
@@ -312,10 +371,10 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
 
   // ── phase 5: reveal ──
   async function doReveal() {
-    // ghost leaps down to the right of / below the prize card (card: 34% centre, ~276px tall)
+    // ghost leaps down to the left of / below the prize card (it sits on the left end of the bough) (card: 34% centre, ~276px tall)
     {
-      const W = el.clientWidth, H = el.clientHeight, g = perch.el.querySelector('.pc-ghost')!.getBoundingClientRect(), o = el.getBoundingClientRect();
-      const targetTop = H * 0.34 + 166, targetLeft = W - g.width - 6;
+      const H = el.clientHeight, g = perch.el.querySelector('.pc-ghost')!.getBoundingClientRect(), o = el.getBoundingClientRect();
+      const targetTop = H * 0.34 + 166, targetLeft = 6;
       perch.el.style.setProperty('--aside', `${Math.round(targetLeft - (g.left - o.left))}px`);
       perch.el.style.setProperty('--drop', `${Math.round(targetTop - (g.top - o.top))}px`);
     }

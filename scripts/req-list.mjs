@@ -1,0 +1,11 @@
+import { chromium } from 'playwright';
+const BASE = 'http://localhost:4173/ghost-gift/';
+const b = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
+const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true });
+const p = await ctx.newPage(); const cdp = await ctx.newCDPSession(p); await cdp.send('Network.enable');
+const urls = new Map(); cdp.on('Network.responseReceived', (e) => urls.set(e.requestId, e.response.url));
+const rows = []; cdp.on('Network.loadingFinished', (e) => rows.push([Math.round(e.encodedDataLength / 1024), urls.get(e.requestId)]));
+await p.goto(BASE + (process.argv[2] || '?tier=high'), { waitUntil: 'load' }); await p.waitForTimeout(4000);
+rows.sort((a, c) => c[0] - a[0]).forEach((r) => console.log(String(r[0]).padStart(5), 'KB', r[1].replace(BASE, '')));
+console.log('total', rows.reduce((a, r) => a + r[0], 0));
+await b.close();
