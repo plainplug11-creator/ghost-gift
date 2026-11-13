@@ -4,11 +4,21 @@
 .perch:not(.is-lite) .pc-bough { animation: bough-sway 7s ease-in-out infinite; }
 @keyframes bough-sway { 50% { transform: rotate(0.5deg) translateY(1px); } }
 .pc-branch { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 8px 10px rgba(0, 0, 12, 0.6)); }
-.pc-leaf { position: absolute; width: 26px; height: 26px; margin-left: -13px; transform: rotate(var(--r)) scale(var(--s)); }
-.pc-leaf .ji { --ji: 26px; display: block; filter: drop-shadow(0 2px 3px rgba(0, 0, 12, 0.5)); transform-origin: 50% 90%; }
-.perch:not(.is-lite) .pc-leaf .ji { animation: pc-sway var(--d) ease-in-out infinite; }
-.perch:not(.is-lite) .pc-leaf:nth-child(odd) .ji { animation-delay: -1.7s; }
-@keyframes pc-sway { 50% { transform: rotate(10deg); } }
+.pc-leaf { position: absolute; width: 22px; height: 27px; margin-left: -11px; transform-origin: 50% 100%; transform: rotate(var(--r)) scale(var(--s)); }
+.pc-leaf .lf { position: absolute; inset: 0; transform-origin: 50% 100%; }
+.lf-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.lf-glow { position: absolute; left: -45%; right: -45%; top: -30%; bottom: -10%; border-radius: 50%; opacity: 0.55;
+  background: radial-gradient(closest-side, currentColor, transparent); }
+.perch.is-lite .lf-glow { opacity: 0.3; }
+.pc-leaf.is-maple .ji { --ji: 26px; position: absolute; left: -2px; bottom: 0; display: block; filter: drop-shadow(0 0 5px rgba(255, 140, 60, 0.45)); }
+.perch:not(.is-lite) .pc-leaf .lf { animation: pc-sway var(--d) ease-in-out var(--dl) infinite; }
+.perch:not(.is-lite) .lf-glow { animation: lf-pulse calc(var(--d) * 0.8) ease-in-out var(--dl) infinite; }
+@keyframes pc-sway { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(9deg); } }
+@keyframes lf-pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.75; } }
+/* wind gust on spin start */
+.perch.is-gust:not(.is-lite) .pc-leaf .lf { animation: pc-gust 0.42s ease-in-out var(--dl) 4 alternate; }
+@keyframes pc-gust { 0% { transform: rotate(4deg) skewX(-4deg); } 100% { transform: rotate(26deg) skewX(-10deg) scaleY(0.92); } }
+.perch.is-gust:not(.is-lite) .lf-glow { opacity: 0.9; }
 .pc-falls { position: absolute; left: 0; right: 0; bottom: 30px; height: 0; }
 .pc-fall { position: absolute; top: 0; width: 22px; height: 22px; opacity: 0; }
 .pc-fall .ji { --ji: 22px; display: block; }
@@ -17,36 +27,8 @@
 .pc-shadow { position: absolute; left: 10%; right: 10%; top: 12%; bottom: 8%; border-radius: 50%; background: radial-gradient(closest-side, rgba(63, 227, 255, 0.22), rgba(166, 92, 255, 0.1) 60%, transparent); }
 .pc-body { position: absolute; inset: 0; transform-origin: 50% 92%; }
 .pc-inner { position: absolute; inset: 0; transform-origin: 50% 92%; }
-.perch:not(.is-lite) .pc-inner { animation: pc-breathe 3.4s ease-in-out infinite; }
-@keyframes pc-breathe { 50% { transform: scale(1.015, 1.035); } }
-.pc-img { position: absolute; inset: 0; width: 100%; height: 100%; -webkit-user-drag: none; filter: drop-shadow(0 4px 6px rgba(6, 4, 30, 0.5)); }
-.pc-face { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.pc-face g, .pc-face path, .pc-face ellipse { transform-box: fill-box; transform-origin: center; }
-.pc-blush ellipse { fill: #ff8fd0; opacity: 0.38; transition: opacity 0.3s ease; }
-.pc-look { transition: transform 0.35s cubic-bezier(.22,1,.36,1); }
-.pc-eo, .pc-eh, .pc-m, .pc-sweat { transition: opacity 0.16s ease, transform 0.3s cubic-bezier(.34,1.56,.64,1); }
-.pc-eh, .pc-m, .pc-sweat { opacity: 0; }
-.pc-sweat { fill: rgba(159, 243, 255, 0.9); transform: translateY(-14px); }
-.perch:not(.is-lite) .pc-eyes { animation: pc-blink 4.6s ease-in-out infinite; }
-@keyframes pc-blink { 0%, 93%, 100% { transform: none; } 96% { transform: scaleY(0.12); } }
-
-/* moods */
-.perch[data-mood="idle"] .m-open, .perch[data-mood="happy"] .m-open { opacity: 1; }
-.perch[data-mood="watch"] .m-o, .perch[data-mood="lean"] .m-o, .perch[data-mood="gasp"] .m-o { opacity: 1; }
-.perch[data-mood="meh"] .m-flat { opacity: 1; }
-.perch[data-mood="ecstatic"] .m-grin { opacity: 1; }
-.perch[data-mood="happy"] .pc-eo, .perch[data-mood="ecstatic"] .pc-eo { opacity: 0; }
-.perch[data-mood="happy"] .pc-eh, .perch[data-mood="ecstatic"] .pc-eh { opacity: 1; }
-.perch[data-mood="happy"] .pc-eyes, .perch[data-mood="ecstatic"] .pc-eyes, .perch[data-mood="gasp"] .pc-eyes, .perch[data-mood="lean"] .pc-eyes { animation: none; }
-.perch[data-mood="watch"] .pc-eo { transform: scale(1.04); }
-.perch[data-mood="lean"] .pc-eo { transform: scale(1.1); }
+/* the ghost itself (layers, eyes, moods) lives in ghost.css; the perch only tilts/leans it */
 .perch[data-mood="lean"] .pc-ghost { transform: rotate(-13deg) translate(-5px, 2px); }
-.perch[data-mood="gasp"] .pc-eo { transform: scale(1.16); }
-.perch[data-mood="gasp"] .m-o { transform: scale(1.35); }
-.perch[data-mood="gasp"] .pc-sweat { opacity: 1; transform: none; }
-.perch[data-mood="gasp"] .pc-blush ellipse { opacity: 0.12; }
-.perch[data-mood="meh"] .pc-eo { transform: translateY(5px) scaleY(0.62); }
-.perch[data-mood="ecstatic"] .pc-blush ellipse { opacity: 0.6; }
 
 /* sparkles (4-point stars) */
 .pc-sparks { position: absolute; width: 0; height: 0; left: calc(var(--gpos) * 100%); bottom: calc(45px + var(--pm) * 0.55); }
@@ -75,6 +57,6 @@
 .op.is-reveal .op-perch { z-index: 3; }
 .op-perch .pc-bough { transition: opacity 0.4s ease; }
 .op.is-reveal .op-perch .pc-bough { opacity: 0; }
-.cd-hero .perch { --pm: 66px; --gpos: 0.86; top: 0; left: calc(var(--pad, 16px) * -1); right: calc(var(--pad, 16px) * -1); z-index: 0; }
+.cd-hero .perch { --pm: 84px; --gpos: 0.86; top: 0; left: calc(var(--pad, 16px) * -1); right: calc(var(--pad, 16px) * -1); z-index: 0; }
 .cd-hero .cd-float { z-index: 1; }
-.cd-hero { height: 296px; padding-top: 78px; box-sizing: border-box; }
+.cd-hero { height: 306px; padding-top: 90px; box-sizing: border-box; }

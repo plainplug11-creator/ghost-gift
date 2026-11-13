@@ -2,7 +2,7 @@ import { h } from '../core/dom';
 import { lang } from '../core/i18n';
 import { tier, reducedMotion } from '../core/perf';
 import { ji } from '../art/games';
-import blank from '../assets/mascot-blank.webp';
+import { createGhost } from './ghost';
 
 /**
  * Ghost mascot perched on an autumn branch. Reuses the jelly mascot art (face
@@ -42,54 +42,42 @@ const LINES: Record<'ru' | 'en' | 'uk', Record<Line, string[]>> = {
 
 const TALK = new URLSearchParams(location.search).has('talk'); // QA: always speak
 
-const FACE = `<svg class="pc-face" viewBox="0 0 512 512" aria-hidden="true">
-  <defs><radialGradient id="pcEye" cx=".38" cy=".3" r=".75"><stop offset="0" stop-color="#2c3274"/><stop offset=".6" stop-color="#151a46"/><stop offset="1" stop-color="#0a0c26"/></radialGradient></defs>
-  <g class="pc-blush"><ellipse cx="163" cy="218" rx="25" ry="13"/><ellipse cx="343" cy="218" rx="25" ry="13"/></g>
-  <g class="pc-look">
-    <g class="pc-eyes">
-      <g class="pc-eo">
-        <ellipse cx="200.6" cy="188" rx="20.5" ry="27.5" fill="url(#pcEye)"/><ellipse cx="306.7" cy="188" rx="20.5" ry="27.5" fill="url(#pcEye)"/>
-        <circle cx="193" cy="175" r="7.5" fill="#fff"/><circle cx="299" cy="175" r="7.5" fill="#fff"/>
-        <circle cx="208" cy="199" r="3.4" fill="#fff" opacity=".85"/><circle cx="314" cy="199" r="3.4" fill="#fff" opacity=".85"/>
-      </g>
-      <g class="pc-eh" fill="none" stroke="#151a46" stroke-width="10" stroke-linecap="round">
-        <path d="M180 194 Q200.6 166 221 194"/><path d="M286 194 Q306.7 166 327 194"/>
-      </g>
-    </g>
-    <g class="pc-mouths" fill="#171a48">
-      <g class="pc-m m-open"><path d="M232 209 Q252 214 272 209 Q270 237 252 238 Q234 237 232 209Z"/><ellipse cx="252" cy="230" rx="10" ry="5" fill="#ff8fd0" opacity=".75"/></g>
-      <g class="pc-m m-o"><ellipse cx="252" cy="224" rx="10" ry="12.5"/></g>
-      <g class="pc-m m-flat"><path d="M236 223 Q244 216 252 222 T268 220" fill="none" stroke="#171a48" stroke-width="7" stroke-linecap="round"/></g>
-      <g class="pc-m m-grin"><path d="M220 206 Q252 216 284 206 Q280 249 252 250 Q224 249 220 206Z"/><ellipse cx="252" cy="240" rx="14" ry="6.5" fill="#ff8fd0" opacity=".8"/><path d="M228 210 Q252 216 276 210 L274 216 Q252 221 230 216Z" fill="#fff" opacity=".9"/></g>
-    </g>
-  </g>
-  <path class="pc-sweat" d="M372 120 Q384 140 380 150 A11 11 0 1 1 362 146 Q362 136 372 120Z"/>
-</svg>`;
 
-// branch: thick dark-navy bough spanning the full width (left → right), subtle neon rim; orange only on leaves
+// branch: a thick, curvy dark-navy bough across the whole header with curling tendrils and a neon rim
+// (cyan → violet → magenta); leaves are neon outlines that glow and sway, a few orange maple leaves as accents
 const NS = 'vector-effect="non-scaling-stroke"';
+const TOP = 'M-6 12 C40 13 78 30 140 38 S 240 29 290 32 S 362 34 406 21';
+const BOT = 'L406 36 C362 46 330 45 290 46 S 200 57 140 58 S 30 51 -6 53 Z';
+const CURLS = ['M58 21 C55 7 72 -2 84 5 C93 11 86 21 77 16', 'M200 35 C203 19 222 12 231 21 C237 29 226 35 220 28', 'M108 57 C110 70 126 76 133 67',
+  'M330 45 C334 59 350 63 355 54', 'M248 31 C262 13 284 7 302 10', 'M372 30 C380 18 394 14 404 16'];
 const BRANCH = `<svg class="pc-branch" viewBox="0 0 400 80" preserveAspectRatio="none" aria-hidden="true">
   <defs>
-    <linearGradient id="pcBark" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#262a66"/><stop offset=".4" stop-color="#14163c"/><stop offset="1" stop-color="#05061a"/></linearGradient>
-    <linearGradient id="pcRim" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#46e6ff" stop-opacity=".95"/><stop offset=".5" stop-color="#a65cff" stop-opacity=".8"/><stop offset="1" stop-color="#ff5ccc" stop-opacity=".7"/></linearGradient>
+    <linearGradient id="pcBark" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a2d70"/><stop offset=".35" stop-color="#16184a"/><stop offset="1" stop-color="#05061a"/></linearGradient>
+    <linearGradient id="pcRim" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#46e6ff"/><stop offset=".5" stop-color="#a65cff"/><stop offset="1" stop-color="#ff5ccc"/></linearGradient>
   </defs>
   <g fill="none" stroke-linecap="round">
-    <path d="M70 30 C64 18 66 8 78 2" stroke="#17194a" stroke-width="7" ${NS}/><path d="M70 30 C64 18 66 8 78 2" stroke="url(#pcRim)" stroke-width="1.2" ${NS} opacity=".7"/>
-    <path d="M296 32 C304 20 314 13 330 10" stroke="#17194a" stroke-width="6" ${NS}/><path d="M296 32 C304 20 314 13 330 10" stroke="url(#pcRim)" stroke-width="1.1" ${NS} opacity=".7"/>
-    <path d="M150 48 C156 60 152 70 162 78" stroke="#111338" stroke-width="6" ${NS}/>
-    <path d="M360 40 C368 50 366 58 374 66" stroke="#111338" stroke-width="5" ${NS}/>
+    ${CURLS.map((d) => `<path d="${d}" stroke="#15174a" stroke-width="6" ${NS}/><path d="${d}" stroke="url(#pcRim)" stroke-width="5" stroke-opacity=".18" ${NS}/><path d="${d}" stroke="url(#pcRim)" stroke-width="1.3" ${NS}/>`).join('')}
   </g>
-  <path d="M-6 10 C70 18 150 32 222 30 C290 28 340 22 406 24 L406 48 C340 46 290 54 222 56 C150 58 70 64 -6 70 Z" fill="url(#pcBark)"/>
-  <path d="M-6 10 C70 18 150 32 222 30 C290 28 340 22 406 24" fill="none" stroke="url(#pcRim)" stroke-width="2.4" ${NS}/>
-  <path d="M-6 70 C70 64 150 58 222 56 C290 54 340 46 406 48" fill="none" stroke="#a65cff" stroke-opacity=".35" stroke-width="1.2" ${NS}/>
-  <g stroke="#04050f" stroke-width="1.6" stroke-linecap="round" opacity=".7" fill="none"><path d="M24 38 l14 1" ${NS}/><path d="M96 41 l12 0" ${NS}/><path d="M190 42 l10 0" ${NS}/><path d="M262 38 l12 -1" ${NS}/><path d="M340 34 l10 0" ${NS}/></g>
-  <ellipse cx="120" cy="42" rx="5" ry="3.4" fill="#04050f" opacity=".7"/><ellipse cx="250" cy="40" rx="4" ry="3" fill="#04050f" opacity=".6"/>
+  <path d="${TOP} ${BOT}" fill="url(#pcBark)"/>
+  <path d="${TOP}" fill="none" stroke="url(#pcRim)" stroke-width="7" stroke-opacity=".2" ${NS}/>
+  <path d="${TOP}" fill="none" stroke="url(#pcRim)" stroke-width="2.2" ${NS}/>
+  <path d="M-6 53 C30 51 140 58 140 58 S 200 57 290 46 S 362 46 406 36" fill="none" stroke="#a65cff" stroke-opacity=".4" stroke-width="1.2" ${NS}/>
+  <path d="M10 30 C60 34 110 46 160 47 S 250 40 300 39" fill="none" stroke="#46e6ff" stroke-opacity=".22" stroke-width="1" ${NS}/>
+  <g stroke="#04050f" stroke-width="1.5" stroke-linecap="round" opacity=".65" fill="none"><path d="M24 34 l14 1" ${NS}/><path d="M96 44 l12 1" ${NS}/><path d="M190 46 l10 0" ${NS}/><path d="M262 40 l12 -1" ${NS}/><path d="M340 40 l10 -1" ${NS}/></g>
 </svg>`;
-// leaf spots along the bough: x%, bottom px (within the 80px branch box), rotation, scale, sway period
-const LEAVES: [number, number, number, number, number][] = [
-  [3, 46, -30, 1.05, 4.2], [9, 22, 160, 0.9, 5.1], [17.5, 70, -20, 1.1, 3.8], [21, 58, 30, 0.85, 4.6], [34, 20, 190, 0.95, 5.4],
-  [38, 1, 200, 1, 4.4], [47, 42, -50, 0.8, 3.9], [56, 22, 170, 0.9, 5.0], [80, 70, 10, 1.05, 4.1], [83.5, 58, 60, 0.85, 4.8], [92, 10, 195, 0.95, 4.5], [97, 44, -35, 0.9, 5.2],
+const NEON_LEAF = `<svg class="lf-svg" viewBox="0 0 24 30" aria-hidden="true"><path d="M12 29.5 L12 24" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  <path d="M12 24.5 C2.5 18 3 7.5 12 1 C21 7.5 21.5 18 12 24.5Z" fill="currentColor" fill-opacity=".3" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+  <path d="M12 22 L12 5.5 M12 15 L7.6 10.6 M12 15 L16.4 10.6 M12 19.4 L8.2 16 M12 19.4 L15.8 16" stroke="#fff" stroke-opacity=".8" stroke-width=".85" stroke-linecap="round" fill="none"/></svg>`;
+const LC: Record<string, string> = { c: '#46e6ff', v: '#b07bff', m: '#ff5ccc' };
+// leaves along the bough: x%, bottom px (80px box), rotation, scale, sway s, colour (c/v/m neon, o = orange maple)
+const LEAVES: [number, number, number, number, number, string][] = [
+  [2, 67, -22, 1, 4.2, 'c'], [5.5, 28, 168, 0.95, 5.1, 'o'], [12.5, 62, 24, 0.9, 3.9, 'm'], [21, 74, -38, 0.85, 4.6, 'v'], [19, 27, 196, 0.9, 4.4, 'c'],
+  [28.5, 45, -30, 1, 5.3, 'o'], [33, 14, 186, 0.85, 4.0, 'm'], [41, 42, 34, 0.95, 4.8, 'c'], [47.5, 24, 162, 0.9, 5.2, 'v'], [55.5, 61, -14, 0.9, 4.1, 'm'],
+  [60, 28, 196, 0.95, 4.7, 'o'], [65.5, 66, -48, 0.85, 3.8, 'c'], [75.5, 70, 28, 0.85, 4.5, 'v'], [79, 34, 176, 0.9, 5.0, 'm'], [88.5, 25, 200, 0.85, 4.3, 'c'],
+  [93, 51, -24, 0.95, 4.9, 'o'], [98.5, 63, 22, 0.85, 4.2, 'm'], [96, 42, 160, 0.8, 4.6, 'v'],
 ];
+const leafHtml = ([x, b, r, sc, d, c]: (typeof LEAVES)[number], i: number) =>
+  `<span class="pc-leaf${c === 'o' ? ' is-maple' : ''}${i === 9 ? ' l2' : ''}" data-r="${r}" data-s="${sc}" style="left:${x}%;bottom:${b}px;--r:${r}deg;--s:${sc};--d:${d}s;--dl:${(-i * 0.61).toFixed(2)}s${c === 'o' ? '' : `;color:${LC[c]}`}"><span class="lf">${c === 'o' ? '' : '<i class="lf-glow"></i>'}${c === 'o' ? ji('leaf') : NEON_LEAF}</span></span>`;
 
 export interface Perch {
   el: HTMLElement;
@@ -101,6 +89,8 @@ export interface Perch {
   /** maybe say a random line from the pool (chance 0..1); returns whether it spoke */
   say(line: Line, chance?: number): boolean;
   hop(): void;
+  /** wind gust (spin start): leaves shiver, a couple tear off and fly away */
+  gust(): void;
   destroy(): void;
 }
 
@@ -110,21 +100,22 @@ export function createPerch(opts: { cls?: string; size?: number; bubble?: boolea
   if (opts.size) el.style.setProperty('--pm', `${opts.size}px`);
   if (opts.pos) el.style.setProperty('--gpos', String(opts.pos));
   el.innerHTML = `<div class="pc-bough">${BRANCH}
-    ${LEAVES.map(([x, b, r, sc, d], i) => `<span class="pc-leaf${i === 6 ? ' l2' : ''}" style="left:${x}%;bottom:${b}px;--r:${r}deg;--s:${sc};--d:${d}s">${ji('leaf')}</span>`).join('')}</div>
+    ${LEAVES.map(leafHtml).join('')}</div>
     <div class="pc-falls"><span class="pc-fall">${ji('leaf')}</span><span class="pc-fall">${ji('leaf')}</span></div>
-    <div class="pc-actor">    <div class="pc-ghost"><i class="pc-shadow"></i><div class="pc-body"><div class="pc-inner"><img class="pc-img" src="${blank}" alt="" draggable="false" decoding="async">${FACE}</div></div></div>
+    <div class="pc-actor">    <div class="pc-ghost"><i class="pc-shadow"></i><div class="pc-body"><div class="pc-inner"></div></div></div>
     <div class="pc-sparks">${Array.from({ length: 7 }, (_, i) => `<i style="--k:${i}"></i>`).join('')}</div>
     ${opts.bubble === false ? '' : '<div class="pc-bubble glass"><span></span></div>'}</div>`;
   const $ = (s: string) => el.querySelector(s) as HTMLElement;
-  const ghost = $('.pc-ghost'), body = $('.pc-body'), look = el.querySelector('.pc-look') as SVGGElement;
+  const ghost = $('.pc-ghost'), body = $('.pc-body');
+  const gh = createGhost();
+  $('.pc-inner').append(gh.el);
   const bubble = el.querySelector<HTMLElement>('.pc-bubble'), btext = bubble?.querySelector('span');
-  let gx = 0, gy = 0, mood: Mood = 'idle', spoken = 0, bubbleT = 0;
+  let mood: Mood = 'idle', spoken = 0, bubbleT = 0;
   const timers: number[] = [];
   const later = (fn: () => void, ms: number) => { timers.push(window.setTimeout(fn, ms)); };
   const anim = (t: Element, k: Keyframe[], o: KeyframeAnimationOptions) => { if (!reducedMotion) t.animate(k, o); };
 
-  const applyGaze = () => { look.style.transform = `translate(${gx.toFixed(1)}px,${gy.toFixed(1)}px)`; };
-  function lookAt(x: number, y: number) { gx = Math.max(-11, Math.min(11, x)); gy = Math.max(-8, Math.min(9, y)); applyGaze(); }
+    function lookAt(x: number, y: number) { gh.lookAt(x, y); }
 
   function sparks(n: number) {
     if (lite) return;
@@ -139,7 +130,7 @@ export function createPerch(opts: { cls?: string; size?: number; bubble?: boolea
 
   function setMood(m: Mood) {
     if (m === mood && m !== 'happy' && m !== 'ecstatic') return;
-    mood = m; el.dataset.mood = m;
+    mood = m; el.dataset.mood = m; gh.setMood(m);
     switch (m) {
       case 'idle': lookAt(-6, 5); break;
       case 'watch': lookAt(-8, 8); break;
@@ -164,17 +155,15 @@ export function createPerch(opts: { cls?: string; size?: number; bubble?: boolea
           { duration: 1300, easing: 'ease-in-out' });
         anim(el.querySelector('.pc-bough')!, [{ transform: 'none' }, { transform: 'rotate(1.6deg)', offset: 0.36 }, { transform: 'rotate(-1deg)', offset: 0.6 }, { transform: 'none' }], { duration: 1300, easing: 'ease-in-out' });
         sparks(7); later(() => sparks(5), 650);
-        if (!lite) anim($('.pc-leaf.l2'), [{ transform: 'none', opacity: 1 }, { transform: 'translate(-30px,170px) rotate(260deg)', opacity: 0 }], { duration: 2200, delay: 250, easing: 'cubic-bezier(.4,.1,.6,1)', fill: 'forwards' });
+        if (!lite) { const l2 = $('.pc-leaf.l2'), b = `rotate(${l2.dataset.r}deg) scale(${l2.dataset.s})`; anim(l2, [{ transform: b, opacity: 1 }, { transform: `translate(-30px,170px) ${b} rotate(260deg)`, opacity: 0 }], { duration: 2200, delay: 250, easing: 'cubic-bezier(.4,.1,.6,1)', fill: 'forwards' }); }
         break;
       }
     }
   }
 
-  let lastFlick = 0;
   function flick(speed: number) {
     if (lite || speed > 0.55) return;
-    const now = performance.now(); if (now - lastFlick < 90) return; lastFlick = now;
-    look.animate([{ transform: `translate(${gx + 5}px,${gy}px)` }, { transform: `translate(${gx}px,${gy}px)` }], { duration: 110 + (1 - speed) * 120, easing: 'ease-out' });
+    gh.flick();
   }
 
   function say(line: Line, chance = 1) {
@@ -188,7 +177,7 @@ export function createPerch(opts: { cls?: string; size?: number; bubble?: boolea
     return true;
   }
 
-  function hop() { anim(body, [{ transform: 'none' }, { transform: 'translateY(-10px) scale(.96,1.05)', offset: 0.35 }, { transform: 'scale(1.05,.94)', offset: 0.65 }, { transform: 'none' }], { duration: 560, easing: 'ease-out' }); }
+  function hop() { gh.pop(); anim(body, [{ transform: 'none' }, { transform: 'translateY(-10px) scale(.96,1.05)', offset: 0.35 }, { transform: 'scale(1.05,.94)', offset: 0.65 }, { transform: 'none' }], { duration: 560, easing: 'ease-out' }); }
 
   ghost.addEventListener('click', () => { hop(); });
   // now and then a leaf lets go and drifts down (rich tiers only)
@@ -202,6 +191,24 @@ export function createPerch(opts: { cls?: string; size?: number; bubble?: boolea
     fallT = window.setTimeout(dropLeaf, 4500 + Math.random() * 4000);
   };
   if (!lite) fallT = window.setTimeout(dropLeaf, 1800 + Math.random() * 2000);
+  let gustT = 0;
+  function gust() {
+    if (lite) return;
+    el.classList.remove('is-gust'); void el.offsetWidth; el.classList.add('is-gust');
+    clearTimeout(gustT); gustT = window.setTimeout(() => el.classList.remove('is-gust'), 1900);
+    anim($('.pc-bough'), [{ transform: 'none' }, { transform: 'rotate(.9deg) translateY(2px)', offset: 0.25 }, { transform: 'rotate(-.5deg)', offset: 0.6 }, { transform: 'none' }], { duration: 1800, easing: 'ease-in-out' });
+    // two leaves away from the ghost let go and ride the wind off to the right
+    const pool = Array.from(el.querySelectorAll<HTMLElement>('.pc-leaf:not(.l2):not(.is-gone)'));
+    for (let k = 0; k < 2 && pool.length; k++) {
+      const lf = pool.splice((Math.random() * pool.length) | 0, 1)[0];
+      const base = `rotate(${lf.dataset.r}deg) scale(${lf.dataset.s})`, dx = 140 + Math.random() * 120, dy = -20 + Math.random() * 90, spin = 300 + Math.random() * 260;
+      lf.classList.add('is-gone');
+      lf.animate([{ transform: base, opacity: 1 }, { transform: `translate(${dx * 0.3}px,${dy * 0.2 - 18}px) ${base} rotate(${spin * 0.3}deg)`, opacity: 1, offset: 0.3 },
+        { transform: `translate(${dx}px,${dy}px) ${base} rotate(${spin}deg) scale(.6)`, opacity: 0 }], { duration: 1500 + k * 250, delay: 150 + k * 220, easing: 'cubic-bezier(.3,.1,.5,1)', fill: 'forwards' });
+      // a new leaf grows back a little later
+      later(() => { lf.getAnimations().forEach((a) => a.cancel()); lf.animate([{ transform: `${base} scale(.2)`, opacity: 0 }, { transform: base, opacity: 1 }], { duration: 700, easing: 'cubic-bezier(.34,1.56,.64,1)' }); lf.classList.remove('is-gone'); }, 5200 + k * 400);
+    }
+  }
   lookAt(-6, 5);
-  return { el, setMood, lookAt, flick, say, hop, destroy() { timers.forEach(clearTimeout); clearTimeout(bubbleT); clearTimeout(fallT); } };
+  return { el, setMood, lookAt, flick, say, hop, gust, destroy() { timers.forEach(clearTimeout); clearTimeout(bubbleT); clearTimeout(fallT); clearTimeout(gustT); } };
 }

@@ -49,6 +49,21 @@ function emberSprite(rgb: string, size = 32) {
   return c;
 }
 
+/** 4-point glint (cyan/white/pink) for the occasional sparkle in empty space. */
+function glintSprite(rgb: string, size = 40) {
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const g = c.getContext('2d')!, m = size / 2;
+  const r = g.createRadialGradient(m, m, 0, m, m, m);
+  r.addColorStop(0, `rgba(${rgb},.55)`); r.addColorStop(1, `rgba(${rgb},0)`);
+  g.fillStyle = r; g.fillRect(0, 0, size, size);
+  g.fillStyle = '#fff'; g.beginPath();
+  g.moveTo(m, 2); g.quadraticCurveTo(m + 2.2, m - 2.2, size - 2, m); g.quadraticCurveTo(m + 2.2, m + 2.2, m, size - 2);
+  g.quadraticCurveTo(m - 2.2, m + 2.2, 2, m); g.quadraticCurveTo(m - 2.2, m - 2.2, m, 2); g.fill();
+  return c;
+}
+interface Fly { x: number; y: number; ax: number; ay: number; fx: number; fy: number; p: number; blink: number; vb: number; s: number; img: HTMLCanvasElement }
+interface Glint { x: number; y: number; t: number; dur: number; s: number; img: HTMLCanvasElement }
+
 interface Leaf { x: number; y: number; z: number; s: number; rot: number; vr: number; phase: number; vp: number; vy: number; sway: number; img: HTMLCanvasElement }
 interface Ember { x: number; y: number; z: number; vy: number; phase: number; life: number; img: HTMLCanvasElement }
 
@@ -59,6 +74,10 @@ export function mountLeaves(canvas: HTMLCanvasElement) {
   const N = tier === 'low' ? 4 : tier === 'mid' ? 7 : 9;
   const E = tier === 'low' ? 3 : 6;
   const frameMin = tier === 'low' ? 1000 / 31 : 0;
+  // fireflies + glints fill the empty space on rich tiers only
+  const F = tier === 'high' ? 12 : tier === 'mid' ? 8 : 0;
+  const glints = tier === 'low' ? [] : ['159,243,255', '255,158,224', '201,166,255'].map((c) => glintSprite(c));
+  let flies: Fly[] = [], gl: Glint[] = [], nextGlint = 1.2;
   let W = 0, H = 0, dpr = 1, raf = 0, last = 0, acc = 0;
 
   const rnd = (a: number, b: number) => a + Math.random() * (b - a);
@@ -82,6 +101,9 @@ export function mountLeaves(canvas: HTMLCanvasElement) {
     W = innerWidth; H = innerHeight;
     canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
     if (!leaves.length) { leaves = Array.from({ length: N }, () => newLeaf(true)); embers = Array.from({ length: E }, () => newEmber(true)); }
+    if (!flies.length && F) flies = Array.from({ length: F }, () => ({
+      x: rnd(0.04, 0.96), y: rnd(0.08, 0.95), ax: rnd(18, 46), ay: rnd(14, 34), fx: rnd(0.08, 0.2), fy: rnd(0.07, 0.17), p: rnd(0, 6.3),
+      blink: rnd(0, 6.3), vb: rnd(0.5, 1.1), s: rnd(12, 24), img: motes[(Math.random() * motes.length) | 0] }));
     draw(0);
   };
 
@@ -95,6 +117,31 @@ export function mountLeaves(canvas: HTMLCanvasElement) {
       const s = 16 * e.z;
       ctx.globalAlpha = Math.max(0, a) * 0.55;
       ctx.drawImage(e.img, (e.x + Math.sin(e.phase) * 8) * dpr - (s * dpr) / 2, e.y * dpr - (s * dpr) / 2, s * dpr, s * dpr);
+    }
+    if (flies.length) {
+      ctx.globalCompositeOperation = 'lighter';
+      for (const f of flies) {
+        f.p += dt; f.blink += f.vb * dt;
+        const x = f.x * W + Math.sin(f.p * f.fx * 6.28) * f.ax, y = f.y * H + Math.cos(f.p * f.fy * 6.28 + 1) * f.ay;
+        const b = Math.max(0, Math.sin(f.blink)), a = 0.12 + 0.6 * b * b;
+        const s = f.s * (0.8 + 0.3 * b) * dpr;
+        ctx.globalAlpha = a; ctx.drawImage(f.img, x * dpr - s / 2, y * dpr - s / 2, s, s);
+        ctx.globalAlpha = a * 0.9; const c = s * 0.28; ctx.drawImage(f.img, x * dpr - c / 2, y * dpr - c / 2, c, c);
+      }
+      nextGlint -= dt;
+      if (glints.length && nextGlint <= 0 && gl.length < 3) {
+        gl.push({ x: rnd(0.05, 0.95) * W, y: rnd(0.06, 0.94) * H, t: 0, dur: rnd(1, 1.6), s: rnd(14, 26), img: glints[(Math.random() * glints.length) | 0] });
+        nextGlint = rnd(0.7, 1.8);
+      }
+      gl = gl.filter((g) => (g.t += dt) < g.dur);
+      for (const g of gl) {
+        const k = Math.sin((g.t / g.dur) * Math.PI), s = g.s * k * dpr;
+        ctx.globalAlpha = k * 0.85;
+        ctx.setTransform(Math.cos(g.t * 1.5), Math.sin(g.t * 1.5), -Math.sin(g.t * 1.5), Math.cos(g.t * 1.5), g.x * dpr, g.y * dpr);
+        ctx.drawImage(g.img, -s / 2, -s / 2, s, s);
+      }
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalCompositeOperation = 'source-over';
     }
     for (const l of leaves) {
       l.phase += l.vp * dt; l.rot += l.vr * dt; l.y += l.vy * dt;

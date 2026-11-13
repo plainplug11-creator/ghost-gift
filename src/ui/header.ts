@@ -2,8 +2,7 @@ import { h, html, starIcon } from '../core/dom';
 import { fmt, t } from '../core/i18n';
 import { store } from '../core/store';
 import { tg } from '../core/telegram';
-import mascot96 from '../assets/mascot-96.webp';
-import mascot160 from '../assets/mascot-160.webp';
+import { createGhost, GHOST_FLAT } from './ghost';
 import { glyphPlus } from '../art/games';
 import { countTo } from './countup';
 import { navigate } from './router';
@@ -31,17 +30,22 @@ export function mascot(id = 'm') {
   el.append(h('span', { class: 'mascot-glow' }), h('span', { class: 'mascot-shadow' }));
   const bob = h('span', { class: 'mascot-bob' });
   void id;
-  bob.append(html(`<img class="mascot-img" srcset="${mascot96} 96w, ${mascot160} 160w" sizes="44px" src="${mascot96}" alt="" decoding="async" draggable="false">`));
+  const g = createGhost({ mini: true });
+  bob.append(g.el);
   el.append(bob);
-  // Tap → happy hop (spring). Restarting the animation via class toggle.
+  // eyes wander now and then; tap → happy hop + star pop
+  let gT = 0;
+  const wander = () => { if (!el.isConnected && gT) return; g.lookAt((Math.random() - 0.5) * 18, (Math.random() - 0.4) * 12); gT = window.setTimeout(wander, 2200 + Math.random() * 2600); };
+  gT = window.setTimeout(wander, 1500);
   el.addEventListener('click', () => {
     el.classList.remove('is-hop'); void el.offsetWidth; el.classList.add('is-hop');
+    g.setMood('happy'); setTimeout(() => g.setMood('idle'), 1200);
   });
   el.addEventListener('animationend', (e) => { if (e.animationName === 'ghost-hop') el.classList.remove('is-hop'); });
   return el;
 }
 
-export const MASCOT_URL = mascot160;
+export const MASCOT_URL = GHOST_FLAT;
 
 /** Balance pill with animated count-up/down + up/down tint. Used in header and pages. */
 export function balancePill(withPlus = true) {

@@ -268,7 +268,7 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
       el.classList.add('is-reel');
       depth();
       anim(reel, [{ opacity: 0, transform: 'translateY(26px) scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: skipped ? 200 : 420, easing: 'cubic-bezier(.22,1,.36,1)' });
-      if (!skipped) { sfx.whoosh(); spoke = perch.say('start', 0.35); }
+      if (!skipped) { sfx.whoosh(); perch.gust(); spoke = perch.say('start', 0.35); }
       perch.setMood('watch'); aim(cx + win.getBoundingClientRect().left - el.getBoundingClientRect().left, win.getBoundingClientRect().top - el.getBoundingClientRect().top + win.clientHeight / 2);
       if (skipped) reelSkip();
       raf = requestAnimationFrame(frame);
