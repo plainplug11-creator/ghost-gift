@@ -38,7 +38,7 @@ async function renderCard(p: Prize) {
   x.beginPath(); x.roundRect(24, 24, W - 48, H - 48, 44); x.stroke(); x.shadowBlur = 0;
   try {
     const [atlas, mascot] = await Promise.all([img(prizesUrl), img(MASCOT_URL)]);
-    const i = ATLAS.indexOf(p.icon), c = 192;
+    const i = ATLAS.indexOf(p.icon), c = atlas.naturalWidth / 4;
     x.drawImage(atlas, (i % 4) * c, ((i / 4) | 0) * c, c, c, W / 2 - 150, 250, 300, 300);
     x.drawImage(mascot, 52, 56, 84, 84);
   } catch { /* draw without art */ }

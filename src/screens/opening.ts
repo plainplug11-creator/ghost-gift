@@ -18,8 +18,7 @@ import { confetti } from '../ui/confetti';
  * one canvas for confetti). Skip fast-forwards any phase.
  */
 
-const STEP = 104;          // tile 96 + gap 8
-const TILE = 96;
+const GAP = 12;             // px between cells (tile size is responsive, see spin())
 const N = 58;              // tiles in the strip
 const WIN = 50;            // winner index
 
@@ -36,7 +35,9 @@ function weightedPick(c: CaseDef) {
 }
 
 function tileHtml(p: Prize, blur = false) {
-  return `<div class="tile r-${p.rarity}" style="--rc:${RARITY_RGB[p.rarity]}">${prizeIcon(p)}${blur ? '' : `<span class="tile-v">${fmt(p.value)}${starIcon('star-ico')}</span>`}</div>`;
+  return blur
+    ? `<div class="tile r-${p.rarity}" style="--rc:${RARITY_RGB[p.rarity]}">${prizeIcon(p)}</div>`
+    : `<div class="tile r-${p.rarity}" style="--rc:${RARITY_RGB[p.rarity]}"><i class="tile-glow"></i>${prizeIcon(p)}<span class="tile-v">${fmt(p.value)}${starIcon('star-ico')}</span><i class="tile-strip"></i></div>`;
 }
 
 export interface Opening { el: HTMLElement; run(): Promise<void>; skip(): void; reveal: HTMLElement; destroy(): Promise<void> }
@@ -55,12 +56,14 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
   if (nearMiss) items[WIN + 1] = best;
   // never put the winner's twin right next to it (reads as a glitch)
   if (items[WIN - 1].id === prize.id) items[WIN - 1] = weightedPick(c);
-  const jitter = nearMiss ? -(34 + Math.random() * 7) : (Math.random() - 0.5) * 56;
+  const jitterU = nearMiss ? -1 : Math.random() - 0.5; // resolved to px once the tile size is known
 
   const [, art] = caseArt(c);
-  const el = h('div', { class: `op r-${prize.rarity}${epicMoment ? ' is-epic' : ''}`, style: `--rc:${rgb};--glow:${c.glow[0]};--glow2:${c.glow[1]}` });
+  const el = h('div', { class: `op r-${prize.rarity}${epicMoment ? ' is-epic' : ''}${tier === 'low' ? ' tier-low' : ''}`, style: `--rc:${rgb};--glow:${c.glow[0]};--glow2:${c.glow[1]}` });
   el.innerHTML = `
     <div class="op-dim"></div>
+    <div class="op-tint"></div>
+    <div class="op-rtint"></div>
     <div class="op-vignette"></div>
     <div class="op-stage">
       <div class="op-glow"></div>
@@ -69,11 +72,12 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
       <div class="op-case"><img class="op-body" src="${art}" alt=""><img class="op-lid" src="${art}" alt=""></div>
     </div>
     <div class="op-reel">
+      <div class="op-land"></div>
       <div class="op-win"><div class="op-strip">
         <div class="op-row op-sharp">${items.map((p) => tileHtml(p)).join('')}</div>
         ${tier === 'low' ? '' : `<div class="op-row op-blur" aria-hidden="true">${items.map((p) => tileHtml(p, true)).join('')}</div>`}
       </div></div>
-      <div class="op-marker"><i></i><i></i></div>
+      <div class="op-marker"><b></b><i></i><i></i></div>
       <div class="op-near">${t('case.nearMiss')}</div>
     </div>
     <div class="op-reveal">
@@ -96,8 +100,14 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
   const stage = $('.op-stage'), glow = $('.op-glow'), caseEl = $('.op-case'), lid = $('.op-lid'), body = $('.op-body');
   const rays = $('.op-rays'), flash = $('.op-flash'), reel = $('.op-reel'), win = $('.op-win'), strip = $('.op-strip');
   const sharp = $('.op-sharp'), blur = el.querySelector<HTMLElement>('.op-blur'), marker = $('.op-marker'), near = $('.op-near');
+  const tint = $('.op-tint'), land = $('.op-land');
   const reveal = $('.op-reveal'), skipBtn = $('.op-skip'), canvas = $<HTMLCanvasElement>('.op-confetti'), vignette = $('.op-vignette');
   const tiles = sharp.children as HTMLCollectionOf<HTMLElement>;
+  const btiles = blur ? (blur.children as HTMLCollectionOf<HTMLElement>) : null;
+  const glows = Array.from(tiles, (t) => t.querySelector<HTMLElement>('.tile-glow')!);
+  const rich = tier !== 'low' && !reducedMotion;  // depth tilt, glow follow, shine, tint reaction
+  let TILE = 132, STEP = TILE + GAP;
+  let stopRiser: () => void = () => {};
 
   let skipped = false;
   let wake: (() => void) | null = null;
@@ -159,13 +169,15 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
     return new Promise((resolve) => {
       const W = win.clientWidth, cx = W / 2;
       const xAt = (i: number) => cx - (i * STEP + TILE / 2);
+      const jitter = nearMiss ? -(TILE / 2 - 7 - Math.random() * 6) : jitterU * TILE * 0.5;
       const x0 = xAt(3) + 30, target = xAt(WIN) + jitter;
-      const over = reducedMotion ? 0 : 16 + Math.random() * 6;
+      const over = reducedMotion ? 0 : TILE * (nearMiss ? 0.16 : 0.12) + Math.random() * 6;
       const D = reducedMotion ? 1400 : epicMoment ? 6400 : 5200;
       const k = epicMoment ? 3.3 : 3; // ease-out power: lower = livelier tail (no dead crawl)
       let t0 = performance.now(), from = x0, dist = target - over - x0, dur = D, mode: 'main' | 'fast' | 'settle' = 'main';
-      let x = x0, lastIdx = -1, lastTick = 0, lastBlur = -1, raf = 0;
+      let x = x0, lastIdx = -1, lastTick = 0, lastBlur = -1, lastTint = -1, raf = 0, riserOn = false;
       const settleFrom = { x: 0, t: 0 };
+      const touched = new Set<number>();
 
       const setBlur = (v: number) => {
         if (!blur) return;
@@ -175,20 +187,47 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
         sharp.style.opacity = String(1 - b * 0.7);
         blur.style.opacity = String(b);
       };
+      // background reaction: case-tinted glow breathes with speed (never hints the rarity)
+      const setTint = (v: number) => {
+        if (!rich) return;
+        const o = 0.25 + Math.min(1, Math.abs(v) / 3000) * 0.65;
+        if (Math.abs(o - lastTint) < 0.04) return;
+        lastTint = o; tint.style.opacity = o.toFixed(2);
+      };
+      // coverflow depth: centre cell dominant, neighbours smaller, tilted toward centre, dimmer
+      const depth = () => {
+        const c = (cx - x - TILE / 2) / STEP; // fractional index under the needle
+        const lo = Math.max(0, Math.floor(c) - 3), hi = Math.min(N - 1, Math.ceil(c) + 3);
+        touched.forEach((i) => { if (i < lo || i > hi) { tiles[i].style.transform = ''; tiles[i].style.opacity = ''; if (btiles) btiles[i].style.transform = ''; glows[i].style.opacity = ''; touched.delete(i); } });
+        for (let i = lo; i <= hi; i++) {
+          const d = i - c, a = Math.min(1, Math.abs(d));
+          const sc = 1.1 - 0.24 * a - 0.04 * Math.max(0, Math.abs(d) - 1);
+          const tr = rich ? `perspective(700px) rotateY(${(-Math.sign(d) * a * 24).toFixed(1)}deg) scale(${sc.toFixed(3)})` : `scale(${sc.toFixed(3)})`;
+          tiles[i].style.transform = tr;
+          tiles[i].style.opacity = (1 - 0.42 * Math.min(1, Math.abs(d) / 1.6)).toFixed(2);
+          if (btiles) btiles[i].style.transform = tr;
+          if (rich) glows[i].style.opacity = Math.max(0, 1 - Math.abs(d) * 1.2).toFixed(2);
+          touched.add(i);
+        }
+      };
       const tick = (now: number, v: number) => {
-        const idx = Math.floor((cx - x) / STEP);
+        const idx = Math.floor((cx - x + GAP / 2) / STEP);
         if (idx === lastIdx) return;
         lastIdx = idx;
-        if (now - lastTick < 45) return;
+        if (rich && tiles[idx]) tiles[idx].classList.add('is-hit');
+        if (now - lastTick < 50) return; // cap haptics/needle at ~20/s
         lastTick = now;
-        sfx.tick(1 + Math.min(0.4, Math.abs(v) / 8000));
-        tg.haptic.tap();
-        marker.animate([{ transform: 'scaleY(1.22)' }, { transform: 'none' }], { duration: 160, easing: 'ease-out' });
+        const sp = Math.min(1, Math.abs(v) / 2800);
+        sfx.tick(sp);
+        tg.haptic.select();
+        const amp = 5 + (1 - sp) * 9; // slow = each peg kicks the needle harder
+        marker.animate([{ transform: 'rotate(0deg)' }, { transform: `rotate(${-amp}deg)`, offset: 0.25 }, { transform: `rotate(${amp * 0.35}deg)`, offset: 0.62 }, { transform: 'rotate(0deg)' }],
+          { duration: 160 + (1 - sp) * 140, easing: 'ease-out' });
       };
       const frame = (now: number) => {
         let p: number, v = 0;
         if (mode === 'settle') {
-          p = Math.min(1, (now - settleFrom.t) / 560);
+          p = Math.min(1, (now - settleFrom.t) / 620);
           const e = 1 - Math.pow(1 - p, 3);
           x = settleFrom.x + (target - settleFrom.x) * e;
         } else {
@@ -197,23 +236,28 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
           const e = 1 - Math.pow(1 - p, kk);
           x = from + dist * e;
           v = (kk * Math.pow(1 - p, kk - 1) * dist) / (dur / 1000);
+          if (!riserOn && mode === 'main' && dur - (now - t0) < 1700 && !reducedMotion) { riserOn = true; stopRiser = sfx.riser(1.7); }
         }
         strip.style.transform = `translate3d(${x.toFixed(1)}px,0,0)`;
+        depth();
         setBlur(v);
+        setTint(v);
         tick(now, v);
         if (p < 1) { raf = requestAnimationFrame(frame); return; }
         if (mode !== 'settle' && over) { mode = 'settle'; settleFrom.x = x; settleFrom.t = now; raf = requestAnimationFrame(frame); return; }
-        setBlur(0);
+        setBlur(0); setTint(0);
         resolve();
       };
       reelSkip = () => {
         if (mode === 'settle') return;
-        const now = performance.now();
-        from = x; dist = target - over - x; t0 = now; dur = 420; mode = 'fast';
+        stopRiser();
+        from = x; dist = target - over - x; t0 = performance.now(); dur = 420; mode = 'fast';
       };
       strip.style.transform = `translate3d(${x0}px,0,0)`;
       el.classList.add('is-reel');
+      depth();
       anim(reel, [{ opacity: 0, transform: 'translateY(26px) scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: skipped ? 200 : 420, easing: 'cubic-bezier(.22,1,.36,1)' });
+      if (!skipped) sfx.whoosh();
       if (skipped) reelSkip();
       raf = requestAnimationFrame(frame);
       void raf;
@@ -223,12 +267,20 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
   // ── phase 4: settle, near-miss, legendary slow-mo ──
   async function settle() {
     reelSkip = null;
+    stopRiser();
     el.classList.add('is-settled');
+    for (let i = Math.max(0, WIN - 5); i <= Math.min(N - 1, WIN + 5); i++) { tiles[i].style.opacity = ''; glows[i].style.opacity = ''; }
+    tiles[WIN].style.transform = ''; if (btiles) btiles[WIN].style.transform = '';
+    if (nearMiss) tiles[WIN + 1].style.transform = '';
     tiles[WIN].classList.add('is-win');
     tg.haptic.medium();
+    sfx.settle();
+    // rarity flash under the needle + the room takes the rarity colour
+    anim(land, [{ opacity: 0, transform: 'scale(.5)' }, { opacity: 1, transform: 'scale(1.05)', offset: 0.3 }, { opacity: 0.55, transform: 'scale(1.25)' }], { duration: 700, easing: 'cubic-bezier(.2,.8,.3,1)' });
+    el.classList.add('is-landed');
     if (nearMiss) {
       tiles[WIN + 1].classList.add('is-near');
-      near.style.left = `${tiles[WIN + 1].getBoundingClientRect().left + TILE / 2 - win.getBoundingClientRect().left}px`;
+      const r = tiles[WIN + 1].getBoundingClientRect(); near.style.left = `${r.left + r.width / 2 - win.getBoundingClientRect().left}px`;
       el.classList.add('is-nearmiss');
       await wait(700);
     } else await wait(380);
@@ -236,7 +288,7 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
       // slow-mo: darken the world, two heartbeats on the winner, then white flash
       anim(vignette, [{ opacity: 0 }, { opacity: 1 }], { duration: 500, easing: 'ease-in' });
       for (let i = 0; i < 2; i++) {
-        tiles[WIN].animate([{ transform: 'scale(1.14)' }, { transform: 'scale(1.3)', offset: 0.3 }, { transform: 'scale(1.14)' }], { duration: 480, easing: 'ease-out' });
+        tiles[WIN].animate([{ transform: 'scale(1.16)' }, { transform: 'scale(1.28)', offset: 0.3 }, { transform: 'scale(1.16)' }], { duration: 480, easing: 'ease-out' });
         tg.haptic.heavy();
         await wait(520);
       }
@@ -280,6 +332,10 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
       await charge();
       await burst();
       el.classList.add('is-burst');
+      // responsive cells: ~3 visible on 360–430 px screens, centre one dominant
+      TILE = Math.round(Math.min(156, Math.max(124, win.clientWidth * 0.36)));
+      STEP = TILE + GAP;
+      el.style.setProperty('--tile', `${TILE}px`);
       await spin();
       await settle();
       await doReveal();

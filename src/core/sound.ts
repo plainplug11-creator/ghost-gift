@@ -2,41 +2,160 @@ import { store } from './store';
 import { tg } from './telegram';
 
 /**
- * Tiny synthesized SFX (WebAudio, no files → zero bytes to download).
- * Muted by default; the toggle persists in Telegram CloudStorage + localStorage.
- * Hooks: tick (reel), charge, burst, reveal(rarity rank 0..4).
- * TODO(audio): swap synth for designed samples later — keep the same API.
+ * Synthesized SFX (WebAudio, zero downloads). Muted by default; the toggle
+ * persists in Telegram CloudStorage + localStorage.
+ *
+ * Sound design for the case reel:
+ *  - tick:   soft "glass/toy" bell (two inharmonic sine partials, 3 ms attack,
+ *            short exp decay) — pitch & volume follow reel speed; rate-capped,
+ *            scheduled on the audio clock (no main-thread jitter, no clicks)
+ *  - whoosh: band-passed noise sweep when the reel launches
+ *  - riser:  gentle ascending glide + airy noise during the last ~1.6 s
+ *  - land:   chime/sparkle scaled by rarity; legendary/mythic get a shimmer chord
+ * iOS (Telegram WebView): the AudioContext must be created/resumed inside a user
+ * gesture → unlock() runs on every touch until the context is 'running'.
  */
 const KEY = 'gg_sound';
 let ctx: AudioContext | null = null;
-const ac = () => {
-  if (!ctx) { const C = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext; if (!C) return null; ctx = new C(); }
-  if (ctx.state === 'suspended') void ctx.resume();
-  return ctx;
-};
+let out: GainNode | null = null;   // master
+let verb: GainNode | null = null;  // send to a tiny glassy reverb
+let noise: AudioBuffer | null = null;
+
+function build() {
+  const C = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!C) return null;
+  const c = new C();
+  const comp = c.createDynamicsCompressor();
+  comp.threshold.value = -16; comp.ratio.value = 4; comp.attack.value = 0.002; comp.release.value = 0.15;
+  out = c.createGain(); out.gain.value = 0.9;
+  out.connect(comp).connect(c.destination);
+  // short sparkly reverb (generated impulse, 1.1 s)
+  const len = Math.floor(c.sampleRate * 1.1), ir = c.createBuffer(2, len, c.sampleRate);
+  for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2); }
+  const conv = c.createConvolver(); conv.buffer = ir;
+  verb = c.createGain(); verb.gain.value = 0.28;
+  verb.connect(conv).connect(out);
+  noise = c.createBuffer(1, c.sampleRate, c.sampleRate);
+  const nd = noise.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+  return c;
+}
+const ac = () => { if (!ctx) ctx = build(); return ctx; };
+
+/** Must run inside a user gesture on iOS. Plays a 1-sample silent buffer to unlock output. */
+export function unlockAudio() {
+  const c = ac(); if (!c) return;
+  if (c.state !== 'running') void c.resume();
+  const b = c.createBufferSource(); b.buffer = c.createBuffer(1, 1, 22050); b.connect(c.destination); b.start(0);
+}
 
 export async function initSound() {
   store.sound.set((await tg.cloud.get(KEY)) === '1');
+  const onGesture = () => {
+    if (!store.sound.get()) return;
+    unlockAudio();
+    if (ctx?.state === 'running') { removeEventListener('pointerdown', onGesture, true); removeEventListener('touchend', onGesture, true); }
+  };
+  addEventListener('pointerdown', onGesture, true);
+  addEventListener('touchend', onGesture, true);
 }
-export function setSound(on: boolean) { store.sound.set(on); tg.cloud.set(KEY, on ? '1' : '0'); if (on) ac(); }
+export function setSound(on: boolean) { store.sound.set(on); tg.cloud.set(KEY, on ? '1' : '0'); if (on) unlockAudio(); }
 
-function tone(freq: number, dur: number, type: OscillatorType = 'sine', gain = 0.06, at = 0, slideTo?: number) {
-  const c = ac(); if (!c) return;
-  const t = c.currentTime + at;
-  const o = c.createOscillator(), g = c.createGain();
-  o.type = type; o.frequency.setValueAtTime(freq, t);
-  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
-  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + 0.02);
+const live = () => store.sound.get() && !!ac() && ctx!.state === 'running';
+
+/** Enveloped sine/triangle voice → master (+ optional reverb send). */
+function voice(freq: number, at: number, dur: number, gain: number, type: OscillatorType = 'sine', send = 0, glideTo?: number) {
+  const c = ctx!, o = c.createOscillator(), g = c.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, at);
+  if (glideTo) o.frequency.exponentialRampToValueAtTime(glideTo, at + dur);
+  g.gain.setValueAtTime(0.0001, at);
+  g.gain.exponentialRampToValueAtTime(gain, at + 0.003);
+  g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+  o.connect(g); g.connect(out!);
+  if (send && verb) { const s = c.createGain(); s.gain.value = send; g.connect(s).connect(verb); }
+  o.start(at); o.stop(at + dur + 0.03);
 }
+function noiseBurst(at: number, dur: number, gain: number, f0: number, f1: number, q = 1.2) {
+  const c = ctx!, src = c.createBufferSource(), bp = c.createBiquadFilter(), g = c.createGain();
+  src.buffer = noise; src.loop = true;
+  bp.type = 'bandpass'; bp.Q.value = q; bp.frequency.setValueAtTime(f0, at); bp.frequency.exponentialRampToValueAtTime(f1, at + dur);
+  g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(gain, at + dur * 0.35); g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+  src.connect(bp).connect(g).connect(out!);
+  src.start(at); src.stop(at + dur + 0.05);
+  return { src, g };
+}
+
+// pentatonic-ish note set (C major pentatonic, hz)
+const N = { C5: 523.25, D5: 587.33, E5: 659.25, G5: 783.99, A5: 880, C6: 1046.5, D6: 1174.7, E6: 1318.5, G6: 1568, A6: 1760, C7: 2093 };
+let lastTickAt = 0;
 
 export const sfx = {
-  tick(pitch = 1) { if (store.sound.get()) tone(1500 * pitch, 0.035, 'triangle', 0.035); },
-  charge(ms: number) { if (store.sound.get()) tone(140, ms / 1000, 'sawtooth', 0.025, 0, 520); },
-  burst() { if (!store.sound.get()) return; tone(90, 0.35, 'sine', 0.12, 0, 40); tone(900, 0.25, 'triangle', 0.04, 0, 2400); },
-  reveal(rank: number) {
-    if (!store.sound.get()) return;
-    const base = [523, 587, 659, 784, 880][rank] ?? 523;
-    [1, 1.25, 1.5, 2].slice(0, 2 + Math.min(2, rank)).forEach((m, i) => tone(base * m, 0.5 + rank * 0.1, 'triangle', 0.05, i * 0.08));
+  /** speed: 0..1 (normalised reel velocity). Rate-capped on the audio clock. */
+  tick(speed = 0.5) {
+    if (!live()) return;
+    const c = ctx!, at = c.currentTime + 0.012;
+    const minGap = 0.045 + (1 - speed) * 0.01;
+    if (at - lastTickAt < minGap) return;
+    lastTickAt = at;
+    const f = 1500 + speed * 900 + (Math.random() - 0.5) * 40;        // faster → brighter
+    const v = 0.035 + (1 - speed) * 0.03;                              // slower → each tick more audible
+    voice(f, at, 0.09 + (1 - speed) * 0.06, v, 'sine', 0.25);
+    voice(f * 2.76, at, 0.05, v * 0.35, 'sine');                       // glassy inharmonic partial
   },
+  charge(ms: number) {
+    if (!live()) return;
+    const at = ctx!.currentTime + 0.01, d = ms / 1000;
+    voice(220, at, d, 0.035, 'triangle', 0.3, 660);
+    noiseBurst(at, d, 0.03, 600, 3200, 2);
+  },
+  burst() {
+    if (!live()) return;
+    const at = ctx!.currentTime + 0.005;
+    voice(110, at, 0.45, 0.16, 'sine', 0, 48);                         // soft thump
+    noiseBurst(at, 0.5, 0.07, 3500, 900, 0.8);                         // airy pop
+    [N.C6, N.G6, N.C7].forEach((f, i) => voice(f, at + 0.03 + i * 0.03, 0.6, 0.02, 'sine', 0.6));
+  },
+  whoosh() {
+    if (!live()) return;
+    noiseBurst(ctx!.currentTime + 0.01, 0.55, 0.09, 400, 2600, 1.4);
+  },
+  /** Gentle ascending riser; returns stop() (called on land/skip). */
+  riser(sec: number) {
+    if (!live()) return () => {};
+    const c = ctx!, at = c.currentTime + 0.01;
+    const o = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter();
+    o.type = 'triangle'; o.frequency.setValueAtTime(N.C5 / 2, at); o.frequency.exponentialRampToValueAtTime(N.G5, at + sec);
+    lp.type = 'lowpass'; lp.frequency.setValueAtTime(900, at); lp.frequency.exponentialRampToValueAtTime(4200, at + sec);
+    g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(0.03, at + sec);
+    o.connect(lp).connect(g).connect(out!);
+    const s = c.createGain(); s.gain.value = 0.4; g.connect(s).connect(verb!);
+    o.start(at); o.stop(at + sec + 0.3);
+    const n = noiseBurst(at, sec + 0.05, 0.02, 1500, 7000, 3);
+    return () => {
+      const t = c.currentTime;
+      try { g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(0.0001, t, 0.03); n.g.gain.cancelScheduledValues(t); n.g.gain.setTargetAtTime(0.0001, t, 0.03); } catch { /* ended */ }
+    };
+  },
+  /** Land chime by rarity rank 0..4. */
+  land(rank: number) {
+    if (!live()) return;
+    const at = ctx!.currentTime + 0.01;
+    const chords = [[N.E5, N.G5], [N.C5, N.E5, N.G5], [N.D5, N.G5, N.A5, N.D6], [N.C5, N.E5, N.G5, N.C6, N.E6], [N.C5, N.G5, N.C6, N.E6, N.G6, N.C7]];
+    const notes = chords[rank] ?? chords[0];
+    notes.forEach((f, i) => voice(f, at + i * (rank >= 3 ? 0.055 : 0.07), 0.7 + rank * 0.25, 0.05 - Math.min(0.02, rank * 0.004), 'triangle', 0.45));
+    if (rank >= 2) {
+      // sparkle shimmer: random high bells over ~0.5–1.4 s
+      const count = rank >= 3 ? 14 : 6, span = rank >= 3 ? 1.4 : 0.6;
+      const hi = [N.C6, N.D6, N.E6, N.G6, N.A6, N.C7];
+      for (let i = 0; i < count; i++) voice(hi[(Math.random() * hi.length) | 0], at + 0.12 + Math.random() * span, 0.35, 0.018, 'sine', 0.8);
+    }
+    if (rank >= 3) voice(65.4, at, 1.6, 0.09, 'sine', 0.2); // warm low swell under legendary/mythic
+  },
+  /** Soft "clack" when the reel locks onto the winner (before the reveal). */
+  settle() {
+    if (!live()) return;
+    const at = ctx!.currentTime + 0.005;
+    voice(N.G6, at, 0.18, 0.04, 'sine', 0.3); voice(N.E6, at + 0.05, 0.25, 0.035, 'sine', 0.4);
+  },
+  /** Reveal = full land chime scaled by rarity. */
+  reveal(rank: number) { this.land(Math.min(4, rank)); },
 };

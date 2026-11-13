@@ -109,34 +109,70 @@
 .op-flash { inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(circle at 50% 38%, #fff 0, rgba(255, 255, 255, 0.85) 22%, rgba(var(--glow), 0.4) 55%, transparent 80%); }
 .op.is-reveal .op-flash { background: radial-gradient(circle at 50% 36%, #fff 0, rgba(255, 255, 255, 0.9) 25%, rgba(var(--rc), 0.55) 55%, rgba(var(--rc), 0.15) 85%); }
 
-/* reel */
-.op-reel { left: 0; right: 0; top: calc(38% - 90px); height: 180px; opacity: 0; }
+/* reel — big coverflow cells; transforms are written per-frame by opening.ts (transform/opacity only) */
+.op { --tile: 132px; }
+.op-tint { inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.25s linear;
+  background: radial-gradient(90% 46% at 50% 38%, rgba(var(--glow), 0.34), rgba(var(--glow2), 0.14) 50%, transparent 78%),
+              radial-gradient(150% 100% at 50% 40%, transparent 45%, rgba(var(--glow2), 0.22) 100%); }
+.op-rtint { inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.6s ease;
+  background: radial-gradient(80% 42% at 50% 38%, rgba(var(--rc), 0.3), transparent 72%), radial-gradient(150% 100% at 50% 40%, transparent 50%, rgba(var(--rc), 0.18) 100%); }
+.op.is-landed .op-tint { opacity: 0 !important; }
+.op.is-landed .op-rtint { opacity: 1; }
+.op-reel { left: 0; right: 0; top: calc(38% - var(--tile) * 0.95); height: calc(var(--tile) * 1.9); opacity: 0; }
 .op-win { position: absolute; inset: 0; overflow: hidden;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 16%, #000 84%, transparent); mask-image: linear-gradient(90deg, transparent, #000 16%, #000 84%, transparent); }
-.op-strip { position: absolute; left: 0; top: 38px; height: 104px; will-change: transform; }
-.op-row { position: absolute; left: 0; top: 0; display: flex; gap: 8px; }
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 13%, #000 87%, transparent); mask-image: linear-gradient(90deg, transparent, #000 13%, #000 87%, transparent); }
+.op-strip { position: absolute; left: 0; top: calc(50% - var(--tile) * 0.56); height: calc(var(--tile) * 1.12); will-change: transform; }
+.op-row { position: absolute; left: 0; top: 0; display: flex; gap: 12px; }
 .op-blur { filter: url(#mb); opacity: 0; will-change: opacity; }
 .op-sharp { will-change: opacity; }
 .tile {
-  position: relative; flex: none; width: 96px; height: 104px; border-radius: 18px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
-  background: linear-gradient(180deg, rgba(var(--rc), 0.2), rgba(14, 16, 46, 0.75) 75%);
-  border: 1px solid rgba(var(--rc), 0.32); box-shadow: inset 0 -3px 0 rgba(var(--rc), 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  transition: opacity 0.45s ease, transform 0.6s var(--spring-bouncy);
+  position: relative; flex: none; width: var(--tile); height: calc(var(--tile) * 1.12); border-radius: 24px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  background: linear-gradient(180deg, rgba(var(--rc), 0.2), rgba(14, 16, 46, 0.72) 72%);
+  border: 1px solid rgba(var(--rc), 0.36);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 0 0 1px rgba(255, 255, 255, 0.03), 0 10px 24px -12px rgba(0, 0, 12, 0.8);
+  backface-visibility: hidden; transform-origin: 50% 55%;
 }
-.tile .pi { --pi: 64px; }
-.tile-v { display: inline-flex; align-items: center; gap: 2px; font-size: 11.5px; font-weight: 750; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.op-sharp .tile { overflow: hidden; }
+.tile .pi { --pi: calc(var(--tile) * 0.7); position: relative; z-index: 1; filter: drop-shadow(0 6px 10px rgba(0, 0, 12, 0.55)); }
+.op-blur .tile .pi { filter: none; }
+/* rarity glow pooled under the art; brightness follows proximity to the needle */
+.tile-glow { position: absolute; left: 8%; right: 8%; top: 18%; height: 62%; border-radius: 50%; opacity: 0.25; pointer-events: none;
+  background: radial-gradient(closest-side, rgba(var(--rc), 0.75), rgba(var(--rc), 0.22) 55%, transparent); }
+/* rarity strip */
+.tile-strip { position: absolute; left: 22%; right: 22%; bottom: 7px; height: 4px; border-radius: 3px; z-index: 1;
+  background: rgb(var(--rc)); box-shadow: 0 0 10px rgba(var(--rc), 0.9); }
+.tile-v { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 3px; margin-bottom: 8px; font-size: 13.5px; font-weight: 800; color: var(--text-1, #fff); font-variant-numeric: tabular-nums; text-shadow: 0 1px 6px rgba(0, 0, 12, 0.7); }
+.tile-v .star-ico { width: 15px; height: 15px; }
+/* glass shine sweep when a cell crosses the needle */
+.op-sharp .tile::after { content: ""; position: absolute; top: -20%; bottom: -20%; left: -60%; width: 45%; z-index: 2; pointer-events: none; opacity: 0;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.32) 50%, transparent); transform: translateX(0) skewX(-12deg); }
+.op-sharp .tile.is-hit::after { animation: tile-shine 0.55s ease-out 1; }
+@keyframes tile-shine { 0% { opacity: 1; transform: translateX(0) skewX(-12deg); } 100% { opacity: 0; transform: translateX(380%) skewX(-12deg); } }
+.op.is-settled .tile { transition: opacity 0.45s ease, transform 0.6s var(--spring-bouncy), box-shadow 0.4s ease; }
 .op.is-settled .tile:not(.is-win):not(.is-near) { opacity: 0.28; }
-.tile.is-win { transform: scale(1.14); z-index: 1; box-shadow: 0 0 0 2px rgba(var(--rc), 0.95), 0 0 24px 0 rgba(var(--rc), 0.65), inset 0 -3px 0 rgba(var(--rc), 1); }
+.tile.is-win { transform: scale(1.16); z-index: 1; border-color: rgba(var(--rc), 0.95);
+  box-shadow: 0 0 0 2px rgba(var(--rc), 0.95), 0 0 34px 2px rgba(var(--rc), 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2); }
+.tile.is-win .tile-glow { opacity: 1; }
 .tile.is-near { opacity: 0.9; animation: near-pulse 0.55s ease-in-out 2; }
-@keyframes near-pulse { 50% { transform: scale(1.06) rotate(2deg); } }
-.op-marker { position: absolute; left: 50%; top: 24px; bottom: 24px; width: 4px; margin-left: -2px; border-radius: 2px; z-index: 2;
-  background: linear-gradient(180deg, #46e6ff, #a65cff 55%, #ff5ccc); box-shadow: 0 0 12px rgba(63, 227, 255, 0.9), 0 0 24px rgba(255, 92, 204, 0.5); }
+@keyframes near-pulse { 50% { transform: scale(1.04) rotate(2deg); } }
+/* rarity flash under the needle on landing */
+.op-land { left: 50%; top: 50%; width: calc(var(--tile) * 2.2); height: calc(var(--tile) * 2.2); margin: calc(var(--tile) * -1.1) 0 0 calc(var(--tile) * -1.1); border-radius: 50%; opacity: 0; pointer-events: none;
+  background: radial-gradient(closest-side, rgba(255, 255, 255, 0.5), rgba(var(--rc), 0.55) 30%, rgba(var(--rc), 0.14) 62%, transparent); }
+/* glowing needle: pivots at the top pointer, wobbles on every passing cell */
+.op-marker { position: absolute; left: 50%; top: calc(50% - var(--tile) * 0.86); bottom: calc(50% - var(--tile) * 0.86); width: 4px; margin-left: -2px; border-radius: 2px; z-index: 3;
+  transform-origin: 50% 0; will-change: transform;
+  /* line stays out of the prize art: solid stubs above/below the cell, faint through it */
+  background: linear-gradient(180deg, #46e6ff, rgba(70, 230, 255, 0.9) 14%, rgba(166, 92, 255, 0.14) 19%, rgba(166, 92, 255, 0.14) 81%, rgba(255, 92, 204, 0.9) 86%, #ff5ccc); box-shadow: none; }
+.op-marker b { position: absolute; left: 50%; top: -9px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff, #9ff3ff 35%, #3fe3ff 70%); box-shadow: 0 0 12px rgba(63, 227, 255, 0.95); z-index: 1; }
 .op-marker i { position: absolute; left: 50%; width: 0; height: 0; margin-left: -8px; border: 8px solid transparent; }
-.op-marker i:first-child { top: -6px; border-top: 10px solid #9ff3ff; filter: drop-shadow(0 0 6px #3fe3ff); }
-.op-marker i:last-child { bottom: -6px; border-bottom: 10px solid #ff9ee0; filter: drop-shadow(0 0 6px #ff4fc8); }
-.op-near { top: -2px; transform: translateX(-50%) scale(0.6); opacity: 0; padding: 4px 10px; border-radius: 10px; font-size: 12px; font-weight: 800; white-space: nowrap; color: #fff; background: linear-gradient(135deg, #ff5ccc, #a65cff); box-shadow: 0 6px 18px -4px rgba(255, 79, 200, 0.7); transition: opacity 0.3s ease, transform 0.5s var(--spring-bouncy); }
+.op-marker i:first-of-type { top: 2px; border-top: 11px solid #9ff3ff; filter: drop-shadow(0 0 6px #3fe3ff); }
+.op-marker i:last-of-type { bottom: -6px; border-bottom: 10px solid #ff9ee0; filter: drop-shadow(0 0 6px #ff4fc8); }
+.op-near { top: calc(50% - var(--tile) * 0.96); transform: translateX(-50%) scale(0.6); opacity: 0; padding: 4px 10px; border-radius: 10px; font-size: 12px; font-weight: 800; white-space: nowrap; color: #fff; background: linear-gradient(135deg, #ff5ccc, #a65cff); box-shadow: 0 6px 18px -4px rgba(255, 79, 200, 0.7); transition: opacity 0.3s ease, transform 0.5s var(--spring-bouncy); z-index: 4; }
 .op.is-nearmiss .op-near { opacity: 1; transform: translateX(-50%) scale(1); }
+/* low tier: no glow pools / shine */
+.op.tier-low .tile-glow, .op.tier-low .op-sharp .tile::after { display: none; }
 
 /* reveal */
 .op-reveal { inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.2s ease; }
