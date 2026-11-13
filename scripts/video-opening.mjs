@@ -10,7 +10,7 @@ const browser = await chromium.launch({ args: ['--force-device-scale-factor=2', 
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, colorScheme: 'dark', locale: 'ru-RU' });
 const p = await ctx.newPage();
 const errs = []; p.on('pageerror', (e) => errs.push(e.message)); p.on('console', (m) => m.type() === 'error' && errs.push(m.text()));
-await p.goto(`${BASE}?tier=high&push=case:${caseId}&force=${force}`, { waitUntil: 'networkidle' });
+await p.goto(`${BASE}?tier=high&push=case:${caseId}&force=${force}${process.env.TALK ? "&talk=1" : ""}`, { waitUntil: 'networkidle' });
 await p.waitForTimeout(1500);
 const cdp = await ctx.newCDPSession(p);
 const frames = [];

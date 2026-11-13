@@ -7,6 +7,8 @@ import { PRIZES } from '../api/catalog';
 import { RARITY_RANK, type CaseDef, type OpenResult, type Prize } from '../api/types';
 import { RARITY_RGB, caseArt, prizeIcon, prizeName, rarityName } from '../art/cases';
 import { confetti } from '../ui/confetti';
+import { createPerch } from '../ui/perch';
+import '../styles/perch.css';
 
 /**
  * The case-opening show. Pure presentation: the outcome (`res.prize`) is
@@ -102,6 +104,16 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
   const sharp = $('.op-sharp'), blur = el.querySelector<HTMLElement>('.op-blur'), marker = $('.op-marker'), near = $('.op-near');
   const tint = $('.op-tint'), land = $('.op-land');
   const reveal = $('.op-reveal'), skipBtn = $('.op-skip'), canvas = $<HTMLCanvasElement>('.op-confetti'), vignette = $('.op-vignette');
+  const perch = createPerch({ cls: 'op-perch' });
+  vignette.after(perch.el);
+  /** point the ghost's eyes at a screen point */
+  const aim = (px: number, py: number) => {
+    const r = perch.el.querySelector('.pc-ghost')!.getBoundingClientRect(), o = el.getBoundingClientRect();
+    const fx = r.left + r.width * 0.5 - o.left, fy = r.top + r.height * 0.36 - o.top;
+    const dx = px - fx, dy = py - fy, d = Math.hypot(dx, dy) || 1;
+    perch.lookAt((dx / d) * 10, (dy / d) * 9);
+  };
+  let spoke = false;
   const tiles = sharp.children as HTMLCollectionOf<HTMLElement>;
   const btiles = blur ? (blur.children as HTMLCollectionOf<HTMLElement>) : null;
   const glows = Array.from(tiles, (t) => t.querySelector<HTMLElement>('.tile-glow')!);
@@ -219,6 +231,7 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
         lastTick = now;
         const sp = Math.min(1, Math.abs(v) / 2800);
         sfx.tick(sp);
+        perch.flick(sp);
         tg.haptic.select();
         const amp = 5 + (1 - sp) * 9; // slow = each peg kicks the needle harder
         marker.animate([{ transform: 'rotate(0deg)' }, { transform: `rotate(${-amp}deg)`, offset: 0.25 }, { transform: `rotate(${amp * 0.35}deg)`, offset: 0.62 }, { transform: 'rotate(0deg)' }],
@@ -236,7 +249,7 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
           const e = 1 - Math.pow(1 - p, kk);
           x = from + dist * e;
           v = (kk * Math.pow(1 - p, kk - 1) * dist) / (dur / 1000);
-          if (!riserOn && mode === 'main' && dur - (now - t0) < 1700 && !reducedMotion) { riserOn = true; stopRiser = sfx.riser(1.7); }
+          if (!riserOn && mode === 'main' && dur - (now - t0) < 1700 && !reducedMotion) { riserOn = true; stopRiser = sfx.riser(1.7); perch.setMood('lean'); if (!spoke) spoke = perch.say('slow', 0.3); }
         }
         strip.style.transform = `translate3d(${x.toFixed(1)}px,0,0)`;
         depth();
@@ -257,7 +270,8 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
       el.classList.add('is-reel');
       depth();
       anim(reel, [{ opacity: 0, transform: 'translateY(26px) scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: skipped ? 200 : 420, easing: 'cubic-bezier(.22,1,.36,1)' });
-      if (!skipped) sfx.whoosh();
+      if (!skipped) { sfx.whoosh(); spoke = perch.say('start', 0.35); }
+      perch.setMood('watch'); aim(cx + win.getBoundingClientRect().left - el.getBoundingClientRect().left, win.getBoundingClientRect().top - el.getBoundingClientRect().top + win.clientHeight / 2);
       if (skipped) reelSkip();
       raf = requestAnimationFrame(frame);
       void raf;
@@ -278,6 +292,8 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
     // rarity flash under the needle + the room takes the rarity colour
     anim(land, [{ opacity: 0, transform: 'scale(.5)' }, { opacity: 1, transform: 'scale(1.05)', offset: 0.3 }, { opacity: 0.55, transform: 'scale(1.25)' }], { duration: 700, easing: 'cubic-bezier(.2,.8,.3,1)' });
     el.classList.add('is-landed');
+    if (nearMiss) { perch.setMood('gasp'); perch.say('near', 0.8); }
+    else if (!epicMoment) { perch.setMood(rank === 0 ? 'meh' : 'happy'); perch.say(rank === 0 ? 'common' : 'good', rank === 0 ? 0.45 : 0.6); }
     if (nearMiss) {
       tiles[WIN + 1].classList.add('is-near');
       const r = tiles[WIN + 1].getBoundingClientRect(); near.style.left = `${r.left + r.width / 2 - win.getBoundingClientRect().left}px`;
@@ -310,6 +326,8 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
       setTimeout(() => tg.haptic.success(), 160);
     }
     sfx.reveal(rank);
+    if (rank >= 3) { perch.setMood('ecstatic'); perch.say('epic', 0.9); }
+    else if (nearMiss) setTimeout(() => perch.setMood(rank === 0 ? 'meh' : 'happy'), 250);
     anim(el.querySelector('.op-burst')!, [{ transform: 'scale(.2)', opacity: 1 }, { transform: `scale(${epicMoment ? 2.4 : 1.8})`, opacity: 0 }], { duration: epicMoment ? 1100 : 800, easing: 'cubic-bezier(.1,.7,.3,1)' });
     anim(el.querySelector('.op-rays2')!, [{ opacity: 0, transform: 'scale(.5)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 700, easing: 'cubic-bezier(.22,1,.36,1)' });
     anim(el.querySelector('.op-card')!, [{ opacity: 0, transform: 'translateY(40px) scale(.4)' }, { opacity: 1, transform: 'none' }], { duration: 900, delay: epicMoment ? 260 : 80, easing: 'cubic-bezier(.34,1.56,.64,1)' });
@@ -322,26 +340,42 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
     await sleep(epicMoment ? 1000 : 650);
   }
 
+  // ghost sits on a branch right above the reel, at the screen edge (never over the reel or case art)
+  function layoutPerch() {
+    const H = el.clientHeight;
+    const probe = h('div', { style: 'position:absolute;top:var(--safe-top);height:0' }); el.append(probe);
+    const safe = probe.offsetTop; probe.remove();
+    const branch = H * 0.38 - TILE * 0.62 - 22;             // y of the branch line
+    const pm = Math.round(Math.max(50, Math.min(84, (branch - safe - 8) / 0.92)));
+    perch.el.style.setProperty('--pm', `${pm}px`);
+    perch.el.style.top = `${branch + 38 - (pm + 40)}px`;    // branch top edge sits 38px above the perch bottom
+  }
+
   return {
     el,
     reveal,
     skip,
     async run() {
-      void el.offsetWidth;
-      el.classList.add('is-in');
-      await charge();
-      await burst();
-      el.classList.add('is-burst');
       // responsive cells: ~3 visible on 360–430 px screens, centre one dominant
       TILE = Math.round(Math.min(156, Math.max(124, win.clientWidth * 0.36)));
       STEP = TILE + GAP;
       el.style.setProperty('--tile', `${TILE}px`);
+      layoutPerch();
+      void el.offsetWidth;
+      el.classList.add('is-in');
+      perch.setMood('watch');
+      const st = stage.getBoundingClientRect(), o = el.getBoundingClientRect();
+      aim(st.left + st.width / 2 - o.left, st.top + st.height / 2 - o.top);
+      await charge();
+      await burst();
+      el.classList.add('is-burst');
       await spin();
       await settle();
       await doReveal();
     },
     async destroy() {
       stopConfetti?.();
+      perch.destroy();
       await el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 280, easing: 'ease-in', fill: 'forwards' }).finished.catch(() => {});
       el.remove();
     },

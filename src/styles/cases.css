@@ -169,7 +169,7 @@
 .op-marker i { position: absolute; left: 50%; width: 0; height: 0; margin-left: -8px; border: 8px solid transparent; }
 .op-marker i:first-of-type { top: 2px; border-top: 11px solid #9ff3ff; filter: drop-shadow(0 0 6px #3fe3ff); }
 .op-marker i:last-of-type { bottom: -6px; border-bottom: 10px solid #ff9ee0; filter: drop-shadow(0 0 6px #ff4fc8); }
-.op-near { top: calc(50% - var(--tile) * 0.96); transform: translateX(-50%) scale(0.6); opacity: 0; padding: 4px 10px; border-radius: 10px; font-size: 12px; font-weight: 800; white-space: nowrap; color: #fff; background: linear-gradient(135deg, #ff5ccc, #a65cff); box-shadow: 0 6px 18px -4px rgba(255, 79, 200, 0.7); transition: opacity 0.3s ease, transform 0.5s var(--spring-bouncy); z-index: 4; }
+.op-near { position: absolute; top: calc(50% - var(--tile) * 0.96); transform: translateX(-50%) scale(0.6); opacity: 0; padding: 4px 10px; border-radius: 10px; font-size: 12px; font-weight: 800; white-space: nowrap; color: #fff; background: linear-gradient(135deg, #ff5ccc, #a65cff); box-shadow: 0 6px 18px -4px rgba(255, 79, 200, 0.7); transition: opacity 0.3s ease, transform 0.5s var(--spring-bouncy); z-index: 4; }
 .op.is-nearmiss .op-near { opacity: 1; transform: translateX(-50%) scale(1); }
 /* low tier: no glow pools / shine */
 .op.tier-low .tile-glow, .op.tier-low .op-sharp .tile::after { display: none; }

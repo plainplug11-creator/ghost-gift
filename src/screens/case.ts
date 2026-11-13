@@ -15,6 +15,8 @@ import { openSheet, toast } from '../ui/sheet';
 import type { Page } from '../ui/router';
 import { createOpening, type Opening } from './opening';
 import { openShare } from './sheets';
+import { createPerch } from '../ui/perch';
+import '../styles/perch.css';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const hms = (ms: number) => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${pad((s / 3600) | 0)}:${pad(((s % 3600) / 60) | 0)}:${pad(s % 60)}`; };
@@ -40,6 +42,12 @@ export function createCase(id: string): Page {
   // ── hero ──
   const hero = h('div', { class: 'cd-hero', style: `--glow:${c.glow[0]};--glow2:${c.glow[1]}` });
   hero.append(html(`<span class="cd-halo"></span><span class="cd-float">${caseImg(c, 'cd-img', '240px')}</span><span class="cd-floor"></span>`));
+  // header: our ghost on an autumn branch, looking down at the case; tap = hop
+  const perch = createPerch({ bubble: false });
+  hero.prepend(perch.el);
+  perch.lookAt(-8, 7);
+  perch.el.querySelector('.pc-ghost')!.addEventListener('click', () => tg.haptic.soft());
+  const glance = window.setInterval(() => { perch.lookAt(-1, 1); setTimeout(() => perch.lookAt(-8, 7), 1300); }, 6500);
 
   // ── actions ──
   const openBtn = h('button', { class: 'btn-primary cd-open', 'data-press': '' });
@@ -192,6 +200,6 @@ export function createCase(id: string): Page {
     el,
     // Back during the show = fast-forward (never leave mid-opening)
     onBack() { if (opening) { opening.skip(); return false; } },
-    destroy() { clearTimeout(timer); unBal(); unDaily(); bal.unsub(); snd.unsub(); },
+    destroy() { clearInterval(glance); perch.destroy(); clearTimeout(timer); unBal(); unDaily(); bal.unsub(); snd.unsub(); },
   };
 }
