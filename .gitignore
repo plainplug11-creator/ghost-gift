@@ -1,0 +1,10 @@
+node_modules
+dist
+.deploy
+shots
+*.zip
+
+# large QA recordings (opening videos, ad-hoc captures)
+recordings/
+opening-*.webm
+opening-*.mp4

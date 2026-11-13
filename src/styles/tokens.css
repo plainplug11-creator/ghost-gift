@@ -1,0 +1,59 @@
+:root {
+  /* palette — midnight navy + electric neon (cyan / violet / magenta), orange = autumn leaves only */
+  --bg-0: #04050d;
+  --bg-1: #080a1c;
+  --bg-2: #120a2e;
+  --cyan: #3fe3ff;
+  --blue: #5a7dff;
+  --violet: #9d6bff;
+  --violet-2: #cdb8ff;
+  --magenta: #ff4fc8;
+  --leaf: #ff7a2c;
+  --accent: var(--violet);
+  --text: #eef0ff;
+  --text-2: rgba(230, 234, 255, 0.76);
+  --text-3: rgba(230, 234, 255, 0.52);
+  /* iridescent gloss (ribbon reference) */
+  --iris: linear-gradient(135deg, #46e6ff 0%, #6d86ff 34%, #a65cff 66%, #ff5ccc 100%);
+  --iris-soft: linear-gradient(135deg, rgba(70, 230, 255, 0.22), rgba(166, 92, 255, 0.18) 55%, rgba(255, 92, 204, 0.2));
+
+  /* glass */
+  --glass-bg: linear-gradient(160deg, rgba(160, 180, 255, 0.085), rgba(70, 80, 180, 0.03) 55%, rgba(255, 80, 200, 0.035));
+  --glass-solid: linear-gradient(160deg, rgba(24, 28, 70, 0.62), rgba(12, 14, 40, 0.56) 60%, rgba(32, 14, 56, 0.6));
+  --glass-border: rgba(180, 198, 255, 0.16);
+  --glass-hi: inset 0 1px 0 rgba(225, 235, 255, 0.14);
+  --blur: blur(14px) saturate(150%);
+
+  /* radii / spacing */
+  --r-xl: 24px;
+  --r-lg: 20px;
+  --r-md: 16px;
+  --pad: 16px;
+
+  --shadow-card: 0 14px 30px -18px rgba(0, 0, 10, 0.8), 0 2px 6px -3px rgba(0, 0, 10, 0.4);
+
+  /* motion — physically-based springs baked into CSS linear() (Chrome 113+, Safari 17.2+) */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-press: cubic-bezier(0.3, 0, 0.2, 1);
+  --spring-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --spring-bouncy: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --spring-snappy: cubic-bezier(0.25, 1.1, 0.4, 1);
+  --dur-spring: 700ms;
+  --dur-bouncy: 830ms;
+
+  --safe-top: max(var(--tg-safe-top, 0px), env(safe-area-inset-top, 0px));
+  --safe-bottom: max(var(--tg-safe-bottom, 0px), env(safe-area-inset-bottom, 0px));
+
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    /* stiffness 170 / damping 22 */
+    --spring-soft: linear(0, 0.028, 0.085, 0.169, 0.256, 0.354, 0.442, 0.532, 0.607, 0.681, 0.739, 0.795, 0.837, 0.876, 0.905, 0.931, 0.95, 0.967, 0.978, 0.987, 0.994, 0.998, 1.002, 1.004, 1.005, 1.006, 1.006, 1.005, 1.004, 1.003, 1.002, 1.001, 1);
+    /* stiffness 260 / damping 18 */
+    --spring-bouncy: linear(0, 0.058, 0.18, 0.351, 0.517, 0.688, 0.824, 0.942, 1.022, 1.078, 1.107, 1.118, 1.114, 1.101, 1.082, 1.062, 1.042, 1.025, 1.01, 1, 0.992, 0.988, 0.986, 0.986, 0.988, 0.99, 0.992, 0.994, 0.997, 0.998, 1, 1.001, 1.002, 1.001, 1);
+    /* stiffness 400 / damping 34 */
+    --spring-snappy: linear(0, 0.035, 0.102, 0.187, 0.281, 0.377, 0.469, 0.554, 0.631, 0.709, 0.766, 0.816, 0.857, 0.891, 0.918, 0.94, 0.958, 0.973, 0.983, 0.99, 0.995, 0.999, 1.002, 1.003, 1.004, 1.005, 1.004, 1.003, 1.002, 1.001, 1);
+  }
+}
