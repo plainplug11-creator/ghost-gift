@@ -8,3 +8,7 @@ shots
 recordings/
 opening-*.webm
 opening-*.mp4
+
+.env
+server/data/
+*.db

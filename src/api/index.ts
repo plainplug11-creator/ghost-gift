@@ -1,8 +1,8 @@
 /**
  * API layer. Screens talk ONLY to `api` — never to the RNG or storage.
  *
- * TODO(server): replace `mockApi` with `httpApi` (fetch to our backend, header
- * `Authorization: tma <initData>`). The backend:
+ * When VITE_API_URL is set, `httpApi` is used (header `Authorization: tma <initData>`).
+ * Otherwise the existing mock stays in place and the app behaves as before. The backend:
  *   - verifies initData HMAC with the bot token, rejects stale auth_date
  *   - decides every outcome with server-side RNG (provably fair:
  *     publish sha256(serverSeed) before the round, reveal serverSeed after,
@@ -14,6 +14,7 @@
 import type { CaseDef, Fairness, InvItem, OpenResult } from './types';
 export { ApiError } from './types';
 import { mockApi } from './mock';
+import { httpApi } from './http';
 
 export interface GameApi {
   bootstrap(): Promise<{ balance: number }>;
@@ -29,4 +30,4 @@ export interface GameApi {
   cases(): CaseDef[];
 }
 
-export const api: GameApi = mockApi;
+export const api: GameApi = import.meta.env.VITE_API_URL ? httpApi : mockApi;
