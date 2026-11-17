@@ -9,7 +9,8 @@
     "db:migrate:local": "wrangler d1 migrations apply ghost-gift --local",
     "db:migrate:remote": "wrangler d1 migrations apply ghost-gift --remote",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "sim": "node --experimental-strip-types scripts/sim.ts"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.8.3",

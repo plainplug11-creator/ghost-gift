@@ -10,19 +10,28 @@ export type PrizeIcon = 'stars' | 'heart' | 'bear' | 'rose' | 'gift' | 'cake' | 
 
 export interface Prize {
   id: string;
-  /** gift = Telegram gift (withdrawable via bot), stars = credited to balance, premium = gift subscription */
-  kind: 'gift' | 'stars' | 'premium';
+  /** gift = Telegram gift (withdrawable via bot), stars = credited to balance, premium = gift subscription,
+   *  nft = a real unique (upgraded) Telegram gift from the admin-stocked pool, transferred by the bot */
+  kind: 'gift' | 'stars' | 'premium' | 'nft';
   icon: PrizeIcon;
   /** value in Stars (buyback price = value) */
   value: number;
   rarity: Rarity;
   /** premium months, for kind=premium */
   months?: 3 | 6 | 12;
+  /** concrete NFT for kind=nft results/items (tier prizes in tables don't have it) */
+  nft?: NftInfo;
 }
+
+export interface NftInfo { title: string; name: string; link: string }
 
 export interface CaseDrop { prize: string; weight: number }
 export interface CaseDef {
   id: string;
+  /** display name per language (frontend may override via i18n `case.<id>`) */
+  name: { ru: string; en: string; uk: string };
+  /** visual theme key — each case gets its own interface/style in the frontend */
+  theme: string;
   price: number; // 0 = daily free case
   art: string;   // key in art map (screens/case-art.ts)
   /** two-tone neon glow (r,g,b) */
@@ -52,10 +61,16 @@ export interface OpenResult {
   fairness: Fairness;
 }
 
-export interface InvItem { uid: string; prizeId: string; caseId: string; wonAt: number; status: 'owned' | 'withdrawing' }
+export interface InvItem {
+  uid: string; prizeId: string; caseId: string; wonAt: number; status: 'owned' | 'withdrawing';
+  /** server: sell-back value when it differs from PRIZES[prizeId].value (NFTs) */
+  value?: number;
+  /** server: the concrete NFT for nft items */
+  nft?: NftInfo;
+}
 
 export interface PremiumTier { months: 3 | 6 | 12; price: number; base: number }
 
 export class ApiError extends Error {
-  constructor(public code: 'NO_BALANCE' | 'DAILY_COOLDOWN' | 'NOT_FOUND' | 'BUSY' | 'OFFLINE' | 'AUTH', msg = code) { super(msg); }
+  constructor(public code: 'NO_BALANCE' | 'DAILY_COOLDOWN' | 'NOT_FOUND' | 'BUSY' | 'OFFLINE' | 'AUTH' | 'NFT_PENDING' | 'CANCELLED', msg = code) { super(msg); }
 }
