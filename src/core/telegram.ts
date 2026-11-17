@@ -42,6 +42,8 @@ interface WebApp {
   shareToStory?(mediaUrl: string, params?: { text?: string; widget_link?: { url: string; name?: string } }): void;
   shareMessage?(msgId: string, cb?: (ok: boolean) => void): void;
   openTelegramLink?(url: string): void;
+  openLink?(url: string, opts?: { try_instant_view?: boolean }): void;
+  openInvoice?(url: string, cb?: (status: 'paid' | 'cancelled' | 'failed' | 'pending') => void): void;
   CloudStorage?: { getItem(k: string, cb: (e: unknown, v?: string) => void): void; setItem(k: string, v: string, cb?: (e: unknown, ok?: boolean) => void): void };
   onEvent(e: string, cb: (...a: unknown[]) => void): void;
   offEvent(e: string, cb: (...a: unknown[]) => void): void;
@@ -163,6 +165,19 @@ export const tg = {
       if (inTelegram && wa?.openTelegramLink) safe(() => wa.openTelegramLink!(u));
       else window.open(u, '_blank', 'noopener');
     },
+  },
+
+  /** t.me links stay inside Telegram; everything else opens in the in-app browser. */
+  open(url: string) {
+    if (inTelegram && /^https:\/\/t\.me\//.test(url) && wa?.openTelegramLink) return safe(() => wa.openTelegramLink!(url));
+    if (inTelegram && wa?.openLink) return safe(() => wa.openLink!(url));
+    window.open(url, '_blank', 'noopener');
+  },
+
+  /** Telegram Stars invoice (Bot API 6.1). Resolves with the final status; 'unsupported' outside Telegram. */
+  invoice(url: string): Promise<'paid' | 'cancelled' | 'failed' | 'pending' | 'unsupported'> {
+    if (!at('6.1') || !wa?.openInvoice) return Promise.resolve('unsupported');
+    return new Promise((res) => { try { wa.openInvoice!(url, (st) => res(st)); } catch { res('failed'); } });
   },
 
   backButton: {

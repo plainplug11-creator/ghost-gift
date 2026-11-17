@@ -1,5 +1,6 @@
 import '../styles/prizes.css';
 import '../styles/cases.css';
+import '../styles/themes.css';
 import { h, html, starIcon } from '../core/dom';
 import { fmt, t } from '../core/i18n';
 import { store } from '../core/store';
@@ -8,7 +9,7 @@ import { api } from '../api';
 import { apiErrorText } from '../api/errors';
 import { PREMIUM_TIERS, PRIZES } from '../api/catalog';
 import type { InvItem, Prize } from '../api/types';
-import { RARITY_RGB, prizeIcon, prizeName, rarityName } from '../art/cases';
+import { RARITY_RGB, isNft, isPremium, itemPrize, kindCls, nftOf, prizeIcon, prizeName, rarityName } from '../art/cases';
 import { MASCOT_URL } from '../ui/header';
 import { openSheet, toast } from '../ui/sheet';
 import prizesUrl from '../assets/prizes.webp';
@@ -116,7 +117,8 @@ export function openPremium() {
 
 /** Action sheet for one inventory item: keep / withdraw / sell / → Premium. */
 export function openItem(it: InvItem) {
-  const p = PRIZES[it.prizeId];
+  const p = itemPrize(it);
+  const nftLink = nftOf(p)?.link;
   const pending = it.status === 'withdrawing';
   const btn = (label: Node[] | string, cls: string, fn: () => void, disabled = false) => {
     const b = h('button', { class: cls, 'data-press': '' });
@@ -128,12 +130,12 @@ export function openItem(it: InvItem) {
   const sellLabel = [h('span', null, t('inv.sell')), html(`<span class="cd-price">${fmt(p.value)}${starIcon('star-ico')}</span>`)];
   const s = openSheet([
     h('div', { class: 'it-head', style: `--rc:${RARITY_RGB[p.rarity]}` },
-      html(`<span class="it-ico">${prizeIcon(p)}</span>`),
+      html(`<span class="it-ico">${prizeIcon(p, 'big')}</span>`),
       h('div', { class: 'it-n' }, prizeName(p)),
-      html(`<div class="rs-meta"><span class="rs-r">${rarityName(p)}</span><span class="rs-v">${fmt(p.value)}${starIcon('star-ico')}</span></div>`),
+      html(`<div class="rs-meta"><span class="rs-r">${isNft(p) ? t('nft.unique') : isPremium(p) ? t('prem.kind') : rarityName(p)}</span><span class="rs-v">${fmt(p.value)}${starIcon('star-ico')}</span></div>`),
       pending ? h('span', { class: 'inv-pending' }, t('inv.pending')) : null),
     h('div', { class: 'it-actions' },
-      btn(p.kind === 'premium' ? t('inv.withdrawPremium') : t('inv.withdraw'), 'btn-primary', async () => {
+      btn(isPremium(p) ? t('inv.withdrawPremium') : t('inv.withdraw'), 'btn-primary', async () => {
         try { await api.withdraw(it.uid); tg.haptic.success(); toast(t('inv.queued')); s.close(); }
         catch (e) { tg.haptic.error(); toast(apiErrorText(e), 'err'); }
       }, pending),
@@ -141,11 +143,12 @@ export function openItem(it: InvItem) {
         try { const r = await api.sell(it.uid); tg.haptic.success(); toast(t('result.sold', { n: fmt(r.credited) })); s.close(); }
         catch (e) { tg.haptic.error(); toast(apiErrorText(e), 'err'); }
       }, pending),
-      btn(t('inv.premium'), 'btn-ghost', () => { s.close().then(openPremium); }),
+      isPremium(p) ? null : btn(t('inv.premium'), 'btn-ghost', () => { s.close().then(openPremium); }),
+      nftLink && /^https:\/\/t\.me\//.test(nftLink) ? btn(t('nft.view'), 'btn-text', () => tg.open(nftLink)) : null,
       btn(t('inv.keep'), 'btn-text', () => s.close()),
     ),
     h('p', { class: 'rl-note' }, t('inv.note')),
-  ], { cls: `it r-${p.rarity}` });
+  ], { cls: `it r-${p.rarity}${kindCls(p)}` });
   s.el.style.setProperty('--rc', RARITY_RGB[p.rarity]);
 }
 

@@ -1,12 +1,13 @@
 import { h, starIcon } from '../core/dom';
-import { fmt, t } from '../core/i18n';
+import { fmt, t, type I18nKey } from '../core/i18n';
+import { fxHtml, themeOf, themeVars } from '../art/themes';
 import { reducedMotion, tier } from '../core/perf';
 import { tg } from '../core/telegram';
 import { sfx } from '../core/sound';
 import { PRIZES, caseStats } from '../api/catalog';
 import { countTo } from '../ui/countup';
 import { RARITY_RANK, type CaseDef, type OpenResult, type Prize } from '../api/types';
-import { RARITY_RGB, caseArt, caseName, prizeIcon, prizeName, rarityName } from '../art/cases';
+import { RARITY_RGB, caseArt, caseName, isNft, isPremium, kindCls, prizeIcon, prizeName, rarityName } from '../art/cases';
 import { confetti } from '../ui/confetti';
 import { createPerch } from '../ui/perch';
 import '../styles/perch.css';
@@ -97,8 +98,8 @@ function deckHtml(c: CaseDef, best: Prize) {
 
 function tileHtml(p: Prize, blur = false) {
   return blur
-    ? `<div class="tile r-${p.rarity}" style="--rc:${RARITY_RGB[p.rarity]}">${prizeIcon(p)}</div>`
-    : `<div class="tile r-${p.rarity}" style="--rc:${RARITY_RGB[p.rarity]}"><i class="tile-glow"></i>${prizeIcon(p)}<span class="tile-v">${fmt(p.value)}${starIcon('star-ico')}</span><i class="tile-strip"></i></div>`;
+    ? `<div class="tile r-${p.rarity}${kindCls(p)}" style="--rc:${RARITY_RGB[p.rarity]}">${prizeIcon(p)}</div>`
+    : `<div class="tile r-${p.rarity}${kindCls(p)}" style="--rc:${RARITY_RGB[p.rarity]}"><i class="tile-glow"></i>${prizeIcon(p)}<span class="tile-v">${fmt(p.value)}${starIcon('star-ico')}</span><i class="tile-strip"></i></div>`;
 }
 
 export interface Opening { el: HTMLElement; run(): Promise<void>; skip(): void; reveal: HTMLElement; destroy(): Promise<void> }
@@ -123,12 +124,14 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
   const ch = (caseStats(c).rows.find((r) => r.prize.id === prize.id)?.chance ?? 0) * 100;
   const chanceTxt = `${ch >= 10 ? ch.toFixed(1) : ch >= 1 ? ch.toFixed(2) : ch.toFixed(3)}%`;
   const caseNameTxt = caseName(c);
-  const el = h('div', { class: `op r-${prize.rarity}${epicMoment ? ' is-epic' : ''}${tier === 'low' ? ' tier-low' : ''}`, style: `--rc:${rgb};--glow:${c.glow[0]};--glow2:${c.glow[1]}` });
+  const th = themeOf(c);
+  const el = h('div', { class: `op r-${prize.rarity}${kindCls(prize)} th-${th.key}${epicMoment ? ' is-epic' : ''}${tier === 'low' ? ' tier-low' : ''}`, 'data-theme': th.key, style: `--rc:${rgb};${themeVars(th)}` });
   el.innerHTML = `
     <div class="op-dim"></div>
     <div class="op-tint"></div>
     <div class="op-rtint"></div>
     <div class="op-vignette"></div>
+    ${fxHtml(th, tier === 'low' ? 5 : 16, 'op-fx')}
     <div class="op-stage">
       <div class="op-glow"></div>
       <div class="op-parts">${Array.from({ length: 14 }, () => `<i></i>`).join('')}</div>
@@ -149,13 +152,14 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
     <div class="op-reveal">
       <div class="op-burst"></div>
       <div class="op-rays2"></div>
-      <div class="op-title">${rank === 4 ? t('result.mythic') : t('result.legendary')}</div>
+      <div class="op-title">${isNft(prize) ? 'NFT!' : rank === 4 ? t('result.mythic') : t('result.legendary')}</div>
+      <div class="op-fl">${t(`fl.${th.key}` as I18nKey) || ''}</div>
       <div class="op-aura"></div>
       <div class="op-twinkle">${Array.from({ length: 10 }, (_, i) => `<i style="--i:${i}"></i>`).join('')}</div>
       <div class="op-card">
         <i class="op-card-frame"></i>
-        <div class="op-card-ico">${prizeIcon(prize)}</div>
-        <div class="op-card-r">${rarityName(prize)}</div>
+        <div class="op-card-ico">${prizeIcon(prize, 'big')}</div>
+        <div class="op-card-r">${isNft(prize) ? t('nft.unique') : isPremium(prize) ? t('prem.kind') : rarityName(prize)}</div>
         <div class="op-card-n">${prizeName(prize)}</div>
         <div class="op-card-v"><span class="op-card-num">0</span>${starIcon('star-ico')}</div>
         <div class="op-chips"><span class="op-chip">${t('result.chance')} <b>${chanceTxt}</b></span><span class="op-chip">${t('result.case')} <b>${caseNameTxt}</b></span></div>

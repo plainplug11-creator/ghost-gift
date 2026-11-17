@@ -1,7 +1,7 @@
 import '../styles/prizes.css';
 import '../styles/cases.css';
 import { h, html, starIcon } from '../core/dom';
-import { fmt, t } from '../core/i18n';
+import { fmt, t, type I18nKey } from '../core/i18n';
 import { store } from '../core/store';
 import { tg } from '../core/telegram';
 import { setSound } from '../core/sound';
@@ -9,7 +9,7 @@ import { api } from '../api';
 import { apiErrorText } from '../api/errors';
 import { caseById, caseStats } from '../api/catalog';
 import { RARITY_RANK, type OpenResult } from '../api/types';
-import { RARITY_RGB, caseImg, caseName, prizeIcon, prizeName, rarityName } from '../art/cases';
+import { RARITY_RGB, caseImg, caseName, isNft, isPremium, kindCls, nftOf, prizeIcon, prizeName, rarityName } from '../art/cases';
 import { navBar } from '../ui/nav';
 import { balancePill } from '../ui/header';
 import { openSheet, toast } from '../ui/sheet';
@@ -17,6 +17,9 @@ import type { Page } from '../ui/router';
 import { createOpening, type Opening } from './opening';
 import { openShare } from './sheets';
 import { createPerch } from '../ui/perch';
+import { decoHtml, fxHtml, themeOf, themeVars } from '../art/themes';
+import { tier } from '../core/perf';
+import '../styles/themes.css';
 import '../styles/perch.css';
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -41,13 +44,19 @@ export function createCase(id: string): Page {
   const snd = soundToggle();
 
   // ── hero ──
-  const hero = h('div', { class: 'cd-hero', style: `--glow:${c.glow[0]};--glow2:${c.glow[1]}` });
-  hero.append(html(`<span class="cd-rays" aria-hidden="true"></span><span class="cd-tw" aria-hidden="true">${'<i></i>'.repeat(6)}</span><span class="cd-halo"></span><span class="cd-float">${caseImg(c, 'cd-img', '240px')}</span><span class="cd-floor"></span>`));
+  const th = themeOf(c);
+  const hero = h('div', { class: 'cd-hero' });
+  hero.append(html(`${decoHtml(th)}${fxHtml(th, tier === 'low' ? 6 : 14)}<span class="cd-rays" aria-hidden="true"></span><span class="cd-tw" aria-hidden="true">${'<i></i>'.repeat(6)}</span><span class="cd-halo"></span><span class="cd-float">${caseImg(c, 'cd-img', '240px')}</span><span class="cd-floor"></span>`));
   // header: our ghost on an autumn branch, looking down at the case; tap = hop
   const perch = createPerch({ bubble: false });
   hero.prepend(perch.el);
   perch.lookAt(8, 7);
-  perch.el.querySelector('.pc-ghost')!.addEventListener('click', () => tg.haptic.soft());
+  // easter egg: 7 quick taps on the ghost
+  let taps = 0, tapT = 0;
+  perch.el.querySelector('.pc-ghost')!.addEventListener('click', () => {
+    tg.haptic.soft(); clearTimeout(tapT); tapT = window.setTimeout(() => { taps = 0; }, 1500);
+    if (++taps === 7) { taps = 0; tg.haptic.success(); toast(t(th.key === 'king' ? 'egg.king' : 'egg.ghost'), 'info'); hero.classList.remove('is-egg'); void hero.offsetWidth; hero.classList.add('is-egg'); }
+  });
   // hero scrolled away → its loops (branch leaves, ghost, rays) pause
   const heroIO = 'IntersectionObserver' in window ? new IntersectionObserver(([e]) => hero.classList.toggle('is-idle', !e.isIntersecting)) : null;
   heroIO?.observe(hero);
@@ -94,7 +103,7 @@ export function createCase(id: string): Page {
   rows.forEach(({ prize, chance }, i) => {
     const pct = chance * 100;
     list.append(html(`
-      <div class="pz r-${prize.rarity}" style="--rc:${RARITY_RGB[prize.rarity]};--i:${i}">
+      <div class="pz r-${prize.rarity}${kindCls(prize)}" style="--rc:${RARITY_RGB[prize.rarity]};--i:${i}">
         <span class="pz-ico">${prizeIcon(prize)}</span>
         <span class="pz-n">${prizeName(prize)}</span>
         <span class="pz-v">${fmt(prize.value)}${starIcon('star-ico')}</span>
@@ -104,8 +113,9 @@ export function createCase(id: string): Page {
   const contents = h('section', { class: 'cd-contents' },
     h('div', { class: 'cd-sec' }, h('span', null, t('case.contents')), h('span', { class: 'cd-sec-n' }, t('case.items', { n: rows.length }))), list);
 
-  const scroll = h('div', { class: 'pg-scroll' }, hero, h('div', { class: 'cd-actions' }, openBtn, demoBtn), hint, info, contents);
-  const el = h('div', { class: `pg pg-case cd-${c.id}` }, navBar(caseName(c), snd, bal), scroll);
+  const tagline = h('p', { class: 'cd-tag' }, t(`tag.${th.key}` as I18nKey) || '');
+  const scroll = h('div', { class: 'pg-scroll' }, hero, tagline, h('div', { class: 'cd-actions' }, openBtn, demoBtn), hint, info, contents);
+  const el = h('div', { class: `pg pg-case cd-${c.id} th-${th.key}`, 'data-theme': th.key, style: themeVars(th) }, html('<span class="th-page" aria-hidden="true"></span>'), navBar(caseName(c), snd, bal), scroll);
 
   // ── opening orchestration ──
   let opening: Opening | null = null;
@@ -175,6 +185,12 @@ export function createCase(id: string): Page {
       });
       if (!isDaily) act(priceLabel(t('result.again'), c.price), 'btn-ghost', () => open(false));
     }
+    const nftLink = nftOf(p)?.link;
+    let nftBtn: HTMLElement | null = null;
+    if (nftLink && /^https:\/\/t\.me\//.test(nftLink)) {
+      nftBtn = h('button', { class: 'btn-text rs-nft', 'data-press': '' }, t('nft.view'));
+      nftBtn.addEventListener('click', () => tg.open(nftLink));
+    }
     if (!res.demo && rank >= 2) {
       const sh = h('button', { class: 'rs-share', 'data-press': '', 'aria-label': t('result.share') });
       sh.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 12.5V18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5.5" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>';
@@ -183,16 +199,19 @@ export function createCase(id: string): Page {
     }
     const head = h('div', { class: 'rs-head' },
       h('div', null,
+        h('div', { class: 'rs-fl' }, t(`fl.${th.key}` as I18nKey) || ''),
         h('div', { class: 'rs-k' }, res.demo ? t('result.demoNote') : p.kind === 'stars' ? t('result.credited') : t('result.title')),
         h('div', { class: 'rs-n' }, prizeName(p)),
-        html(`<div class="rs-meta"><span class="rs-r">${rarityName(p)}</span><span class="rs-v">${t('result.value')} · ${fmt(p.value)}${starIcon('star-ico')}</span></div>`)),
+        html(`<div class="rs-meta"><span class="rs-r">${isNft(p) ? 'NFT' : isPremium(p) ? 'Premium' : rarityName(p)}</span><span class="rs-v">${t('result.value')} · ${fmt(p.value)}${starIcon('star-ico')}</span></div>`)),
       btns[0]?.classList.contains('rs-share') ? btns.shift()! : null);
     const fair = h('div', { class: 'rs-fair' }, `#${res.fairness.nonce} · seed ${res.fairness.serverSeed?.slice(0, 8) ?? '—'}… · hash ${res.fairness.serverSeedHash.slice(0, 8)}…`);
-    const sheet = openSheet([head, h('div', { class: `rs-actions n${btns.length}` }, ...btns), fair], {
-      cls: `rs r-${p.rarity}${res.demo ? ' is-demo' : ''}`,
+    const sheet = openSheet([head, h('div', { class: `rs-actions n${btns.length}` }, ...btns), nftBtn, fair].filter((x): x is HTMLElement => !!x), {
+      cls: `rs r-${p.rarity}${kindCls(p)} th-${th.key}${res.demo ? ' is-demo' : ''}`,
       onClose: async () => { opening?.reveal.classList.add('is-out'); await finish(); const f = next; next = null; f?.(); },
     });
     sheet.el.style.setProperty('--rc', RARITY_RGB[p.rarity]);
+    sheet.el.style.cssText += ';' + themeVars(th);
+    sheet.el.dataset.theme = th.key;
   }
 
   openBtn.addEventListener('click', () => open(false));
