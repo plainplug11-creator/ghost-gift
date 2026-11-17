@@ -75,23 +75,34 @@ async function onText(ctx: Ctx, msg: Any) {
 
   if (cmd === '/start') { await send(ctx, msg.chat.id, text(from.language_code, 'welcome'), { reply_markup: playKb }); return { start: true }; }
   if (cmd === '/help') { await send(ctx, msg.chat.id, text(from.language_code, 'help'), { reply_markup: playKb }); return { help: true }; }
-  if (cmd === '/admin' && args[0]) return claimAdmin(ctx, msg.chat.id, fromId, args[0]);
+  if (cmd === '/admin' && !(await isAdmin(ctx, fromId))) return claimAdmin(ctx, msg.chat.id, from, args[0] ?? '');
   if (cmd.startsWith('/') && (await isAdmin(ctx, fromId))) return adminCommand(ctx, msg.chat.id, fromId, cmd, args);
   if (cmd.startsWith('/')) { await send(ctx, msg.chat.id, text(from.language_code, 'help'), { reply_markup: playKb }); return { unknown: true }; }
   return { ignored: true };
 }
 
-async function claimAdmin(ctx: Ctx, chatId: number, fromId: string, code: string) {
-  if (await hitRateLimit(ctx.db, `claim:${fromId}`, 5, 3600_000)) return { claim: 'rate_limited' };
-  const existing = await getSetting(ctx.db, 'admin_id');
+async function claimAdmin(ctx: Ctx, chatId: number, from: Any, code: string) {
+  const fromId = String(from.id);
   const want = ctx.cfg.adminClaimCode;
-  const okCode = !!want && safeEqualHex(await sha256Hex(code), await sha256Hex(want));
-  if (!okCode) { log('warn', 'admin_claim_bad_code', { from: fromId }); await send(ctx, chatId, 'Неизвестная команда.'); return { claim: 'bad' }; }
-  if (existing && existing !== fromId) { await send(ctx, chatId, 'Админ уже назначен.'); return { claim: 'taken' }; }
-  await setSetting(ctx.db, 'admin_id', fromId);
-  log('info', 'admin_claimed', { admin: fromId });
-  await send(ctx, chatId, `✅ Вы админ Ghost Gift.\n\n${ADMIN_HELP}`);
-  return { claim: 'ok' };
+  if (code && want && !(await hitRateLimit(ctx.db, `claim:${fromId}`, 5, 3600_000))) {
+    const okCode = safeEqualHex(await sha256Hex(code), await sha256Hex(want));
+    const existing = await getSetting(ctx.db, 'admin_id');
+    if (okCode && !existing) {
+      await setSetting(ctx.db, 'admin_id', fromId);
+      log('info', 'admin_claimed', { admin: fromId });
+      await send(ctx, chatId, `✅ Вы админ Ghost Gift.\n\n${ADMIN_HELP}`);
+      return { claim: 'ok' };
+    }
+    if (!okCode) log('warn', 'admin_claim_bad_code', { from: fromId });
+  }
+  // No (valid) code: record a request for the operator (scripts/promote-admin.sh).
+  await ctx.db.prepare(`INSERT INTO admin_requests (tg_id, username, first_name, requested_at, attempts, status) VALUES (?, ?, ?, ?, 1, 'pending')
+    ON CONFLICT(tg_id) DO UPDATE SET username = excluded.username, first_name = excluded.first_name, requested_at = excluded.requested_at,
+      attempts = admin_requests.attempts + 1, status = CASE WHEN admin_requests.status = 'promoted' THEN 'pending' ELSE admin_requests.status END`)
+    .bind(fromId, from.username ?? null, from.first_name ?? null, Date.now()).run();
+  log('info', 'admin_request', { from: fromId });
+  await send(ctx, chatId, 'Запрос отправлен');
+  return { claim: 'requested' };
 }
 
 const ADMIN_HELP = `<b>Админ-команды</b>

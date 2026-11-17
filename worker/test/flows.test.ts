@@ -63,15 +63,32 @@ describe('bot basics', () => {
     expect((await hook(a, { update_id: 9002 }, 's3cret')).status).toBe(200);
   });
 
-  it('admin claim: wrong code refused, right code accepted once', async () => {
+  it('admin claim: right code works once; anything else records a request', async () => {
     const a = makeFlowApp();
     await a.db.prepare("DELETE FROM settings WHERE key = 'admin_id'").run();
-    const msg = (from: number, text: string) => ({ message: { message_id: 1, from: { id: from }, chat: { id: from, type: 'private' }, text } });
-    expect((await hook(a, msg(11, '/admin nope'))).body).toEqual({ claim: 'bad' });
+    await a.db.prepare('DELETE FROM admin_requests').run();
+    const msg = (from: number, text: string) => ({ message: { message_id: 1, from: { id: from, username: `n${from}`, first_name: 'Kyryl' }, chat: { id: from, type: 'private' }, text } });
+    expect((await hook(a, msg(13, '/admin'))).body).toEqual({ claim: 'requested' });
+    expect(a.tg.of('sendMessage').at(-1)!.params.text).toBe('Запрос отправлен');
+    expect((await hook(a, msg(11, '/admin nope'))).body).toEqual({ claim: 'requested' });
+    expect((await hook(a, msg(13, '/admin'))).body).toEqual({ claim: 'requested' });
+    const reqs = (await a.db.prepare('SELECT tg_id, username, first_name, attempts, status FROM admin_requests ORDER BY tg_id').all()).results;
+    expect(reqs).toEqual([
+      { tg_id: '11', username: 'n11', first_name: 'Kyryl', attempts: 1, status: 'pending' },
+      { tg_id: '13', username: 'n13', first_name: 'Kyryl', attempts: 2, status: 'pending' },
+    ]);
+    expect(await a.db.prepare("SELECT value FROM settings WHERE key = 'admin_id'").first()).toBeNull();
     expect((await hook(a, msg(11, '/admin c0ffee'))).body).toEqual({ claim: 'ok' });
-    expect((await hook(a, msg(12, '/admin c0ffee'))).body).toEqual({ claim: 'taken' });
+    expect((await hook(a, msg(12, '/admin c0ffee'))).body).toEqual({ claim: 'requested' });
+    expect((await hook(a, msg(11, '/admin'))).body).toEqual({ admin: 'help' });
     expect((await hook(a, msg(11, '/stats'))).body).toMatchObject({ stats: expect.anything() });
     expect((await hook(a, msg(12, '/stats'))).body).toEqual({ unknown: true });
+    // operator promotion (what scripts/promote-admin.sh runs)
+    await a.db.batch([
+      a.db.prepare("INSERT INTO settings (key, value) VALUES ('admin_id', '13') ON CONFLICT(key) DO UPDATE SET value = excluded.value"),
+      a.db.prepare("UPDATE admin_requests SET status = 'promoted' WHERE tg_id = '13'"),
+    ]);
+    expect((await hook(a, msg(13, '/stats'))).body).toMatchObject({ stats: expect.anything() });
     await a.db.prepare("DELETE FROM settings WHERE key = 'admin_id'").run();
   });
 });

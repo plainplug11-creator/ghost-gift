@@ -18,7 +18,7 @@ describe('Tg client', () => {
   });
   it('surfaces 400 errors with the description', async () => {
     const tg = new Tg('t', (async () => resp(400, { ok: false, error_code: 400, description: 'BALANCE_TOO_LOW' })) as typeof fetch);
-    const e = await tg.call('sendGift', {}, { money: true }).catch((x) => x);
+    const e = await tg.call('sendGift', {}, { money: true }).catch((x: unknown) => x) as TgError;
     expect(e).toBeInstanceOf(TgError);
     expect(e.description).toBe('BALANCE_TOO_LOW');
   });
