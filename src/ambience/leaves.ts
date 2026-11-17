@@ -1,4 +1,4 @@
-import { maxDpr, onRunningChange, isRunning, reducedMotion, tier } from '../core/perf';
+import { maxDpr, onRunningChange, onFocusChange, inFocus, isRunning, reducedMotion, tier } from '../core/perf';
 
 /**
  * Ambient background: a handful of slowly drifting autumn leaves + rising embers.
@@ -167,11 +167,12 @@ export function mountLeaves(canvas: HTMLCanvasElement) {
     draw(dt);
     tmo = window.setTimeout(() => { tmo = 0; raf = requestAnimationFrame(frame); }, Math.max(0, frameMin - (performance.now() - now) - 4));
   };
-  const start = () => { if (!raf && !tmo && !reducedMotion && isRunning()) { last = performance.now(); raf = requestAnimationFrame(frame); } };
+  const start = () => { if (!raf && !tmo && !reducedMotion && isRunning() && !inFocus()) { last = performance.now(); raf = requestAnimationFrame(frame); } };
   const stop = () => { cancelAnimationFrame(raf); clearTimeout(tmo); raf = 0; tmo = 0; };
 
   addEventListener('resize', resize, { passive: true });
   onRunningChange((r) => (r ? start() : stop()));
+  onFocusChange((f) => (f ? stop() : start()));
   resize(); start();
   requestAnimationFrame(() => canvas.classList.add('is-ready'));
   return { stop, start };

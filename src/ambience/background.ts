@@ -1,4 +1,4 @@
-import { onRunningChange, isRunning, reducedMotion, tier } from '../core/perf';
+import { onRunningChange, onFocusChange, inFocus, isRunning, reducedMotion, tier } from '../core/perf';
 
 /**
  * Background video: neon Times Square at night with falling leaves (seamless 7.5 s loop).
@@ -47,8 +47,9 @@ export function mountBackground(root: HTMLElement) {
   v.addEventListener('playing', () => v.classList.add('is-ready'), { once: true });
   root.querySelector('.bg-scrim')!.before(v);
 
-  const play = () => { if (isRunning()) v.play().catch(() => { /* autoplay blocked → poster stays */ }); };
+  const play = () => { if (isRunning() && !inFocus()) v.play().catch(() => { /* autoplay blocked → poster stays */ }); };
   onRunningChange((r) => (r ? play() : v.pause()));
+  onFocusChange((f) => (f ? v.pause() : play()));
   // iOS may refuse autoplay until the first touch inside the WebView
   const kick = () => { play(); window.removeEventListener('pointerdown', kick); };
   window.addEventListener('pointerdown', kick, { passive: true });

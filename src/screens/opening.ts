@@ -1,7 +1,7 @@
 import { h, starIcon } from '../core/dom';
 import { fmt, t, type I18nKey } from '../core/i18n';
 import { fxHtml, themeOf, themeVars } from '../art/themes';
-import { reducedMotion, tier } from '../core/perf';
+import { reducedMotion, setFocus, tier } from '../core/perf';
 import { tg } from '../core/telegram';
 import { sfx } from '../core/sound';
 import { PRIZES, caseStats } from '../api/catalog';
@@ -108,6 +108,8 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
   const prize = res.prize;
   const rank = RARITY_RANK[prize.rarity];
   const epicMoment = rank >= 3 && !reducedMotion;   // legendary / mythic
+  const bigWin = rank >= 4 || isNft(prize) || isPremium(prize); // jackpot celebration on top of epic
+  const fx = tier !== 'low' && !reducedMotion;        // streaks, sparks, shock rings, shake
   const rgb = RARITY_RGB[prize.rarity];
 
   // ── reel content built around the decided winner ──
@@ -125,12 +127,13 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
   const chanceTxt = `${ch >= 10 ? ch.toFixed(1) : ch >= 1 ? ch.toFixed(2) : ch.toFixed(3)}%`;
   const caseNameTxt = caseName(c);
   const th = themeOf(c);
-  const el = h('div', { class: `op r-${prize.rarity}${kindCls(prize)} th-${th.key}${epicMoment ? ' is-epic' : ''}${tier === 'low' ? ' tier-low' : ''}`, 'data-theme': th.key, style: `--rc:${rgb};${themeVars(th)}` });
+  const el = h('div', { class: `op r-${prize.rarity}${kindCls(prize)} th-${th.key}${epicMoment ? ' is-epic' : ''}${bigWin ? ' is-big' : ''}${tier === 'low' ? ' tier-low' : ''}`, 'data-theme': th.key, style: `--rc:${rgb};${themeVars(th)}` });
   el.innerHTML = `
     <div class="op-dim"></div>
     <div class="op-tint"></div>
     <div class="op-rtint"></div>
     <div class="op-vignette"></div>
+    <div class="op-squeeze"></div>
     ${fxHtml(th, tier === 'low' ? 5 : 16, 'op-fx')}
     <div class="op-stage">
       <div class="op-glow"></div>
@@ -144,12 +147,14 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
       <div class="op-win"><div class="op-strip">
         <div class="op-row op-sharp">${items.map((p) => tileHtml(p)).join('')}</div>
         ${tier === 'low' ? '' : `<div class="op-row op-blur" aria-hidden="true">${items.map((p) => tileHtml(p, true)).join('')}</div>`}
-      </div></div>
-      <div class="op-lens"><i class="ln-glow"></i><i class="ln-c tl"></i><i class="ln-c tr"></i><i class="ln-c bl"></i><i class="ln-c br"></i><i class="ln-chev up"></i><i class="ln-chev dn"></i><i class="ln-hair"></i></div>
+      </div>${fx ? `<div class="op-streaks" aria-hidden="true">${Array.from({ length: 7 }, (_, i) => `<i style="--i:${i}"></i>`).join('')}</div>` : ''}</div>
+      ${fx ? `<div class="op-shock"><i></i><i></i><i></i></div><div class="op-sparks">${Array.from({ length: 20 }, () => '<i></i>').join('')}</div>` : ''}
+      <div class="op-lens"><i class="ln-pulse"></i><i class="ln-glow"></i><i class="ln-c tl"></i><i class="ln-c tr"></i><i class="ln-c bl"></i><i class="ln-c br"></i><i class="ln-chev up"></i><i class="ln-chev dn"></i><i class="ln-hair"></i></div>
       <div class="op-near">${t('case.nearMiss')}</div>
     </div>
     ${deckHtml(c, best)}
     <div class="op-reveal">
+      ${bigWin && fx ? '<div class="op-jack"><i></i><i></i><i></i><b></b></div>' : ''}
       <div class="op-burst"></div>
       <div class="op-rays2"></div>
       <div class="op-title">${isNft(prize) ? 'NFT!' : rank === 4 ? t('result.mythic') : t('result.legendary')}</div>
@@ -174,7 +179,31 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
   const stage = $('.op-stage'), glow = $('.op-glow'), caseEl = $('.op-case'), lid = $('.op-lid'), body = $('.op-body');
   const rays = $('.op-rays'), flash = $('.op-flash'), reel = $('.op-reel'), win = $('.op-win'), strip = $('.op-strip');
   const sharp = $('.op-sharp'), blur = el.querySelector<HTMLElement>('.op-blur'), lens = $('.op-lens'), near = $('.op-near');
-  const tint = $('.op-tint'), land = $('.op-land');
+  const tint = $('.op-tint'), land = $('.op-land'), squeeze = $('.op-squeeze');
+  const streaks = el.querySelector<HTMLElement>('.op-streaks'), lpulse = $('.ln-pulse'), deck = el.querySelector<HTMLElement>('.op-deck');
+  let focused = false;
+  const focus = (on: boolean) => { if (focused !== on) { focused = on; setFocus(on); } };
+  /** short decaying camera shake (transform only, compositor) */
+  const shake = (amp: number, ms: number) => {
+    if (!fx) return;
+    const kf: Keyframe[] = [];
+    for (let i = 0, n = 9; i <= n; i++) { const a = amp * (1 - i / n); kf.push({ transform: i === n ? 'none' : `translate3d(${((Math.random() - 0.5) * 2 * a).toFixed(1)}px,${((Math.random() - 0.5) * 2 * a * 0.7).toFixed(1)}px,0) rotate(${((Math.random() - 0.5) * a * 0.25).toFixed(2)}deg)` }); }
+    for (const t of [reel, deck]) t?.animate(kf, { duration: ms, easing: 'linear' });
+  };
+  /** pooled sparks + shock rings bursting out of the lens in the rarity colour */
+  const sparkle = (power: number) => {
+    if (!fx) return;
+    el.querySelectorAll<HTMLElement>('.op-shock i').forEach((r, i) => {
+      if (i >= 1 + Math.min(2, power)) return;
+      r.animate([{ transform: 'scale(.35)', opacity: 0.95 }, { transform: `scale(${2.1 + power * 0.35})`, opacity: 0 }], { duration: 650 + i * 120, delay: i * 90, easing: 'cubic-bezier(.15,.75,.3,1)', fill: 'both' });
+    });
+    const sp = el.querySelectorAll<HTMLElement>('.op-sparks i'), count = Math.min(sp.length, 8 + power * 4);
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2 + Math.random() * 0.5, d = 70 + Math.random() * (60 + power * 35), s = 0.6 + Math.random() * 0.8;
+      sp[i].animate([{ transform: `translate3d(0,0,0) scale(${s})`, opacity: 1 }, { opacity: 1, offset: 0.55 }, { transform: `translate3d(${(Math.cos(a) * d).toFixed(0)}px,${(Math.sin(a) * d * 0.8 + 18).toFixed(0)}px,0) scale(0)`, opacity: 0 }],
+        { duration: 620 + Math.random() * 380, easing: 'cubic-bezier(.12,.8,.3,1)', fill: 'both' });
+    }
+  };
   const reveal = $('.op-reveal'), skipBtn = $('.op-skip'), canvas = $<HTMLCanvasElement>('.op-confetti'), vignette = $('.op-vignette');
   const perch = createPerch({ cls: 'op-perch', antics: false });
   vignette.after(perch.el);
@@ -270,6 +299,7 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
         lastBlur = b;
         sharp.style.opacity = String(1 - b * 0.7);
         blur.style.opacity = String(b);
+        if (streaks) streaks.style.opacity = (b * 0.9).toFixed(2);
       };
       // background reaction: case-tinted glow breathes with speed (never hints the rarity)
       const setTint = (v: number) => {
@@ -286,7 +316,8 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
         touched.forEach((i) => { if (i < lo || i > hi) { glows[i].style.opacity = ''; touched.delete(i); } });
         for (let i = lo; i <= hi; i++) { glows[i].style.opacity = Math.max(0.25, 1 - Math.abs(i - c) * 1.1).toFixed(2); touched.add(i); }
       };
-      const tick = (now: number, v: number) => {
+      let lastBeat = 0;
+      const tick = (now: number, v: number, prog: number) => {
         const idx = Math.floor((cx - x + GAP / 2) / STEP);
         if (idx === lastIdx) return;
         lastIdx = idx;
@@ -294,8 +325,10 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
         if (now - lastTick < 50) return; // cap haptics/needle at ~20/s
         lastTick = now;
         const sp = Math.min(1, Math.abs(v) / 2800);
-        sfx.tick(sp);
+        sfx.tick(sp, prog);
         perch.flick(sp);
+        // the lens "breathes" on every cell once the reel is slow enough to follow by eye
+        if (fx && sp < 0.6) lpulse.animate([{ opacity: 0.9 - sp, transform: 'scale(1.06)' }, { opacity: 0, transform: 'scale(1)' }], { duration: 220, easing: 'ease-out' });
         tg.haptic.select();
       };
       const frame = (now: number) => {
@@ -310,13 +343,24 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
           const e = 1 - Math.pow(1 - p, kk);
           x = from + dist * e;
           v = (kk * Math.pow(1 - p, kk - 1) * dist) / (dur / 1000);
-          if (!riserOn && mode === 'main' && dur - (now - t0) < 1700 && !reducedMotion) { riserOn = true; stopRiser = sfx.riser(1.7); perch.setMood('lean'); el.classList.add('is-slow'); if (!spoke) spoke = perch.say('slow', 0.3); }
+          if (!riserOn && mode === 'main' && dur - (now - t0) < 1700 && !reducedMotion) { riserOn = true; lastBeat = now - 400; stopRiser = sfx.riser(1.7); perch.setMood('lean'); el.classList.add('is-slow'); if (!spoke) spoke = perch.say('slow', 0.3); }
+          // anticipation: heartbeat that speeds up as the reel crawls to a stop
+          if (riserOn && mode === 'main' && !reducedMotion) {
+            const left = dur - (now - t0), gap = 380 + Math.max(0, left / 1700) * 300;
+            if (now - lastBeat > gap && left > 150) {
+              lastBeat = now; sfx.heartbeat(0.7 + (1 - left / 1700) * 0.5); tg.haptic.tap();
+              if (fx) {
+                squeeze.animate([{ opacity: 0.55 }, { opacity: 1, offset: 0.18 }, { opacity: 0.6 }], { duration: 360, easing: 'ease-out' });
+                lens.animate([{ transform: 'scale(1.04)' }, { transform: 'scale(1.1)', offset: 0.2 }, { transform: 'scale(1.04)' }], { duration: 340, easing: 'ease-out' });
+              }
+            }
+          }
         }
         strip.style.transform = `translate3d(${x.toFixed(1)}px,0,0)`;
         depth();
         setBlur(v);
         setTint(v);
-        tick(now, v);
+        tick(now, v, mode === 'settle' ? 1 : p);
         if (p < 1) { raf = requestAnimationFrame(frame); return; }
         if (mode !== 'settle' && over) { mode = 'settle'; settleFrom.x = x; settleFrom.t = now; raf = requestAnimationFrame(frame); return; }
         setBlur(0); setTint(0);
@@ -353,6 +397,8 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
     // rarity flash under the needle + the room takes the rarity colour
     anim(land, [{ opacity: 0, transform: 'scale(.5)' }, { opacity: 1, transform: 'scale(1.05)', offset: 0.3 }, { opacity: 0.55, transform: 'scale(1.25)' }], { duration: 700, easing: 'cubic-bezier(.2,.8,.3,1)' });
     el.classList.add('is-landed');
+    sparkle(rank);
+    if (rank >= 2) shake(2 + rank * 1.5, 380 + rank * 60);
     anim(lens, [{ transform: 'scale(1.1)' }, { transform: 'scale(.97)', offset: 0.45 }, { transform: 'scale(1)' }], { duration: 620, easing: 'cubic-bezier(.34,1.56,.64,1)', fill: 'none' });
     if (nearMiss) { perch.setMood('gasp'); perch.say('near', 0.8); }
     else if (!epicMoment) { perch.setMood(rank === 0 ? 'meh' : 'happy'); perch.say(rank === 0 ? 'common' : 'good', rank === 0 ? 0.45 : 0.6); }
@@ -360,6 +406,9 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
       tiles[WIN + 1].classList.add('is-near');
       const r = tiles[WIN + 1].getBoundingClientRect(); near.style.left = `${r.left + r.width / 2 - win.getBoundingClientRect().left}px`;
       el.classList.add('is-nearmiss');
+      sfx.nearMiss(); tg.haptic.soft();
+      // the jackpot cell wobbles "almost!" and tries to slide back in
+      if (fx) tiles[WIN + 1].animate([{ translate: '0 0' }, { translate: '-10px 0', offset: 0.35 }, { translate: '3px 0', offset: 0.7 }, { translate: '0 0' }], { duration: 560, delay: 120, easing: 'ease-in-out' });
       await wait(700);
     } else await wait(380);
     if (epicMoment && !skipped) {
@@ -394,7 +443,14 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
       rank >= 2 ? tg.haptic.heavy() : tg.haptic.medium();
       setTimeout(() => tg.haptic.success(), 160);
     }
-    sfx.reveal(rank);
+    sfx.reveal(rank, bigWin);
+    if (bigWin && fx) {
+      // jackpot: gold/holo shock rings + a light sweep across the card + a heavier shake
+      el.querySelectorAll<HTMLElement>('.op-jack i').forEach((r, i) =>
+        r.animate([{ transform: 'scale(.2)', opacity: 1 }, { transform: 'scale(3.2)', opacity: 0 }], { duration: 1100, delay: 120 + i * 220, easing: 'cubic-bezier(.1,.7,.3,1)', fill: 'both' }));
+      el.querySelector('.op-jack b')?.animate([{ transform: 'translateX(-160%) skewX(-18deg)', opacity: 0 }, { opacity: 1, offset: 0.3 }, { transform: 'translateX(160%) skewX(-18deg)', opacity: 0 }], { duration: 1000, delay: 700, easing: 'ease-in-out', fill: 'both' });
+      reveal.animate([{ transform: 'none' }, { transform: 'translate3d(-5px,3px,0)', offset: 0.1 }, { transform: 'translate3d(5px,-3px,0)', offset: 0.25 }, { transform: 'translate3d(-3px,2px,0)', offset: 0.45 }, { transform: 'translate3d(2px,-1px,0)', offset: 0.7 }, { transform: 'none' }], { duration: 520, delay: 140, easing: 'linear' });
+    }
     if (rank >= 3) { perch.setMood('ecstatic'); perch.say('epic', 0.9); }
     else if (nearMiss) setTimeout(() => perch.setMood(rank === 0 ? 'meh' : 'happy'), 250);
     anim(el.querySelector('.op-burst')!, [{ transform: 'scale(.2)', opacity: 1 }, { transform: `scale(${epicMoment ? 2.4 : 1.8})`, opacity: 0 }], { duration: epicMoment ? 1100 : 800, easing: 'cubic-bezier(.1,.7,.3,1)' });
@@ -435,6 +491,7 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
       layoutPerch();
       void el.offsetWidth;
       el.classList.add('is-in');
+      focus(true); // freeze the background video + leaves (still visible) so the reel gets every frame
       perch.setMood('watch');
       const st = stage.getBoundingClientRect(), o = el.getBoundingClientRect();
       aim(st.left + st.width / 2 - o.left, st.top + st.height / 2 - o.top);
@@ -444,9 +501,11 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
       await spin();
       await settle();
       await doReveal();
+      focus(false);
     },
     async destroy() {
       stopConfetti?.();
+      focus(false);
       perch.destroy();
       await el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 280, easing: 'ease-in', fill: 'forwards' }).finished.catch(() => {});
       el.remove();

@@ -309,8 +309,9 @@
 .rs-actions.n3 .btn-text { grid-column: auto; }
 .rs-fair { margin-top: 12px; text-align: center; font: 600 10.5px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text-3); }
 
-.toast { position: fixed; left: 50%; top: calc(var(--safe-top) + 12px); z-index: 120; max-width: calc(100% - 32px); transform: translate3d(-50%, -16px, 0) scale(0.96); opacity: 0;
-  padding: 11px 16px; border-radius: 16px; font-size: 14px; font-weight: 650; text-align: center;
+/* sits just under the 60px page header (never over the title / balance) */
+.toast { position: fixed; left: 50%; top: calc(var(--safe-top) + 66px); z-index: 120; max-width: calc(100% - 32px); transform: translate3d(-50%, -16px, 0) scale(0.96); opacity: 0;
+  padding: 11px 16px; border-radius: 16px; font-size: 14px; font-weight: 650; text-align: center; width: max-content; pointer-events: none;
   background: rgba(22, 24, 64, 0.94); border: 1px solid var(--glass-border); box-shadow: 0 16px 40px -12px rgba(0, 0, 10, 0.9);
   transition: transform 0.55s var(--spring-bouncy), opacity 0.25s ease; }
 .toast.is-in { transform: translate3d(-50%, 0, 0); opacity: 1; }
@@ -462,3 +463,45 @@ html:not([data-tier="low"]) .bs.rs.is-open .rs-n { animation: name-shimmer 3s ea
 .dk-floor::after { content: ""; position: absolute; left: 20%; right: 20%; top: -14px; height: 28px; border-radius: 50%; background: radial-gradient(closest-side, rgba(140, 120, 255, 0.28), transparent); }
 @container (max-height: 250px) { .dk-label { display: none; } }
 @container (max-width: 360px) { .dk-odds-l { display: none; } .dk-odd { padding: 0 7px; gap: 4px; } }
+
+/* ═════════ Opening juice (v2): streaks, heartbeat squeeze, sparks, shock rings, jackpot ═════════ */
+.op-dim { background: radial-gradient(120% 70% at 50% 40%, rgba(20, 14, 58, 0.6), rgba(4, 3, 16, 0.86)); }
+/* anticipation: soft partial vignette + case-coloured rim while the reel crawls (pulses with the heartbeat) */
+.op-squeeze { inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.5s ease;
+  background: radial-gradient(130% 80% at 50% 38%, transparent 42%, rgba(var(--glow2), 0.16) 70%, rgba(0, 0, 8, 0.72) 100%); }
+.op.is-slow:not(.is-landed) .op-squeeze { opacity: 0.6; }
+.op.is-landed .op-squeeze { opacity: 0; transition-duration: 0.3s; }
+/* speed streaks: thin neon lines racing across the reel window; opacity follows reel speed */
+.op-streaks { position: absolute; inset: 0; pointer-events: none; opacity: 0; z-index: 2; }
+.op-streaks i { position: absolute; left: 0; width: 46%; height: 2px; border-radius: 2px; top: calc(14% + var(--i) * 11.5%);
+  background: linear-gradient(90deg, transparent, rgba(var(--glow), 0.85), rgba(255, 255, 255, 0.9) 70%, transparent);
+  transform: translate3d(240%, 0, 0); will-change: transform; }
+.op-streaks i:nth-child(2n) { width: 30%; background: linear-gradient(90deg, transparent, rgba(var(--glow2), 0.85), #fff 75%, transparent); }
+.op.is-reel:not(.is-landed) .op-streaks i { animation: streak calc(0.34s + var(--i) * 0.045s) linear calc(var(--i) * -0.09s) infinite; }
+@keyframes streak { from { transform: translate3d(240%, 0, 0); } to { transform: translate3d(-120%, 0, 0); } }
+/* lens tick pulse (WAAPI-driven opacity/scale) */
+.ln-pulse { inset: -3px; border-radius: 24px; opacity: 0; border: 2px solid rgba(255, 255, 255, 0.85); box-shadow: 0 0 14px rgba(var(--glow), 0.9); }
+/* landing: shock rings + sparks in the rarity colour, centred on the lens */
+.op-shock, .op-sparks { position: absolute; left: 50%; top: 50%; width: 0; height: 0; z-index: 3; pointer-events: none; }
+.op-shock i { position: absolute; left: calc(var(--tile) * -0.7); top: calc(var(--tile) * -0.7); width: calc(var(--tile) * 1.4); height: calc(var(--tile) * 1.4);
+  border-radius: 50%; border: 3px solid rgba(var(--rc), 0.95); box-shadow: 0 0 18px rgba(var(--rc), 0.8), inset 0 0 14px rgba(var(--rc), 0.5); opacity: 0; }
+.op-shock i:nth-child(2) { border-width: 2px; border-color: rgba(255, 255, 255, 0.8); }
+.op-sparks i { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%; opacity: 0;
+  background: radial-gradient(closest-side, #fff, rgba(var(--rc), 1) 45%, rgba(var(--rc), 0) 100%); }
+.op-sparks i:nth-child(3n) { width: 6px; height: 6px; left: -3px; top: -3px; background: radial-gradient(closest-side, #fff, rgba(255, 255, 255, 0)); }
+.op-sparks i:nth-child(4n+1) { width: 14px; height: 4px; border-radius: 3px; }
+/* rare+ winners glow harder on the reel */
+.op.r-epic .tile.is-win, .op.r-legendary .tile.is-win, .op.r-mythic .tile.is-win { box-shadow: 0 0 0 2px rgba(var(--rc), 1), 0 0 46px 6px rgba(var(--rc), 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+/* jackpot (NFT / Premium / mythic): gold-holo rings + a light sweep behind the card */
+.op-jack { position: absolute; left: 50%; top: 34%; width: 0; height: 0; pointer-events: none; }
+.op-jack i { position: absolute; left: -110px; top: -110px; width: 220px; height: 220px; border-radius: 50%; opacity: 0;
+  border: 3px solid #ffd66e; box-shadow: 0 0 24px rgba(255, 214, 110, 0.8), inset 0 0 20px rgba(255, 214, 110, 0.45); }
+.op-jack i:nth-child(2) { border-color: #7ef3ff; box-shadow: 0 0 24px rgba(126, 243, 255, 0.8); }
+.op-jack i:nth-child(3) { border-color: #ff7ce0; box-shadow: 0 0 24px rgba(255, 124, 224, 0.8); }
+.op-jack b { position: absolute; left: -150px; top: -150px; width: 300px; height: 300px; opacity: 0; z-index: 5;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.55) 46%, rgba(255, 230, 160, 0.7) 50%, rgba(160, 240, 255, 0.5) 54%, transparent 70%);
+  -webkit-mask-image: radial-gradient(closest-side, #000 60%, transparent); mask-image: radial-gradient(closest-side, #000 60%, transparent); }
+.op.is-big .op-title { background: linear-gradient(90deg, #ffe08a, #fff 30%, #7ef3ff 55%, #ff7ce0 80%, #ffe08a); -webkit-background-clip: text; background-clip: text; color: transparent;
+  background-size: 200% 100%; animation: holo-text 2.4s linear infinite; }
+@keyframes holo-text { to { background-position: -200% 0; } }
+.op.tier-low .op-streaks, .op.tier-low .op-sparks, .op.tier-low .op-shock { display: none; }

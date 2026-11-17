@@ -39,6 +39,22 @@ const emit = () => {
 };
 export function onRunningChange(l: Listener) { listeners.add(l); return () => listeners.delete(l); }
 
+/**
+ * Focus mode: a heavy foreground animation (case opening) asks the ambient
+ * layers to freeze in place — the video holds its current frame and the leaves
+ * canvas stops redrawing — so every frame budget goes to the reel. Unlike
+ * `is-paused` this does NOT stop CSS animations of the opening itself.
+ */
+let focus = 0;
+const focusL = new Set<Listener>();
+export const inFocus = () => focus > 0;
+export function setFocus(on: boolean) {
+  const was = focus > 0;
+  focus = Math.max(0, focus + (on ? 1 : -1));
+  if (was !== focus > 0) focusL.forEach((l) => l(focus > 0));
+}
+export function onFocusChange(l: Listener) { focusL.add(l); return () => focusL.delete(l); }
+
 export function initPerf() {
   const html = document.documentElement;
   html.dataset.tier = tier;
