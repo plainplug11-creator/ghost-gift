@@ -6,14 +6,51 @@ import type { CaseDef, CaseDrop, Prize } from './types';
  * players are computed from exactly these weights.
  *
  * Economy (verified by `cd worker && npm run sim`):
- *   - RTP 85–88% on every paid case: base tables 85.2–85.5% (cheap) / 86.5%, NFT tiers add ≤ 1.4 pp
- *     only while real NFTs are in stock, luck card adds ≤ 10% weight to winning drops on cheap cases only.
+ *   - RTP 85–88% on every paid case: base tables 85.2–85.5% (cheap) / 86.5%, NFT collections add ≤ 1.3 pp
+ *     only while in stock, luck card adds ≤ 10% weight to winning non-NFT drops on cheap cases only.
  *   - Daily free case EV ≈ 2.6 Stars. Cases: 0 / 5 / 15 / 25 / 50 / 100 / 250 / 500 / 1000 / 2000 / 3500 / 5000.
  *   - Bank protection: see bankFilter() — the project's bank can't go negative.
  *   - Values = real Telegram prices in Stars (gift star_count, Premium 1000/1500/2500), buyback = value.
  */
 const P = (id: string, kind: Prize['kind'], icon: Prize['icon'], value: number, rarity: Prize['rarity'], months?: 3 | 6 | 12): Prize =>
   ({ id, kind, icon, value, rarity, months });
+
+/**
+ * NFT prizes = real Telegram collectible (upgraded) gift collections. A win gives one gift of that collection
+ * (any model — the cheapest lot on the market, bought and sent by the admin while auto-transfer is unavailable).
+ * value (Stars) = max(cheapest floor across markets × 1.10, Fragment floor) × $1.063/TON ÷ $0.013/Star
+ * (Telegram's developer payout rate), rounded up to 10. Floors checked 17 Nov 2026 ~22:00–23:00 UTC:
+ * cross-market floor — salestracker.tg/gifts (Portals, MRKT, Tonnel, Getgems, Fragment, Market App);
+ * Fragment floor — tggifts.com/floors. Re-check before raising stock; update value + art here only.
+ */
+export interface NftCollection { id: string; title: string; slug: string; art: string; value: number; floorTon: number; fragmentTon: number }
+export const NFT_COLLECTIONS: NftCollection[] = [
+  { id: 'nft_hypno', title: 'Hypno Lollipop', slug: 'hypnolollipop', art: 'hypnolollipop-7', value: 490, floorTon: 5.14, fragmentTon: 6 },
+  { id: 'nft_jackbox', title: 'Jack-in-the-Box', slug: 'jackinthebox', art: 'jackinthebox-5', value: 490, floorTon: 5.25, fragmentTon: 6 },
+  { id: 'nft_hexpot', title: 'Hex Pot', slug: 'hexpot', art: 'hexpot-1', value: 660, floorTon: 5.61, fragmentTon: 8 },
+  { id: 'nft_witchhat', title: 'Witch Hat', slug: 'witchhat', art: 'witchhat-7', value: 660, floorTon: 6.36, fragmentTon: 8 },
+  { id: 'nft_candle', title: 'Eternal Candle', slug: 'eternalcandle', art: 'eternalcandle-6', value: 660, floorTon: 6.78, fragmentTon: 8 },
+  { id: 'nft_evileye', title: 'Evil Eye', slug: 'evileye', art: 'evileye-10', value: 900, floorTon: 9.28, fragmentTon: 11 },
+  { id: 'nft_skullflower', title: 'Skull Flower', slug: 'skullflower', art: 'skullflower-1', value: 1230, floorTon: 13, fragmentTon: 15 },
+  { id: 'nft_crystal', title: 'Crystal Ball', slug: 'crystalball', art: 'crystalball-2', value: 1400, floorTon: 14.5, fragmentTon: 17 },
+  { id: 'nft_pumpkin', title: 'Mad Pumpkin', slug: 'madpumpkin', art: 'madpumpkin-8', value: 1560, floorTon: 13.6, fragmentTon: 19 },
+  { id: 'nft_eskull', title: 'Electric Skull', slug: 'electricskull', art: 'electricskull-2', value: 2870, floorTon: 30.6, fragmentTon: 35 },
+  { id: 'nft_voodoo', title: 'Voodoo Doll', slug: 'voodoodoll', art: 'voodoodoll-3', value: 4010, floorTon: 42.2, fragmentTon: 49 },
+  { id: 'nft_potion', title: 'Magic Potion', slug: 'magicpotion', art: 'magicpotion-4', value: 5970, floorTon: 66.3, fragmentTon: 70 },
+  { id: 'nft_astral', title: 'Astral Shard', slug: 'astralshard', art: 'astralshard-2', value: 13660, floorTon: 131.6, fragmentTon: 167 },
+  { id: 'nft_scaredcat', title: 'Scared Cat', slug: 'scaredcat', art: 'scaredcat-1', value: 26090, floorTon: 285, fragmentTon: 319 },
+  { id: 'nft_durovcap', title: "Durov's Cap", slug: 'durovscap', art: 'durovscap-2', value: 38540, floorTon: 428.4, fragmentTon: 470 },
+];
+export const NFT_PRIZES: Prize[] = NFT_COLLECTIONS.map((n) => ({
+  id: n.id, kind: 'nft', icon: 'diamond', value: n.value, rarity: n.value >= 2500 ? 'mythic' : 'legendary',
+  nft: { title: n.title, name: '', link: `https://fragment.com/gifts/${n.slug}`, art: n.art },
+}));
+export const nftCollection = (prizeId: string) => NFT_COLLECTIONS.find((n) => n.id === prizeId);
+/** Collection of an owned unique gift by its t.me/nft name, e.g. "WitchHat-123" → nft_witchhat. */
+export const nftCollectionByName = (name: string) => {
+  const slug = name.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/-\d+$/, '');
+  return NFT_COLLECTIONS.find((n) => n.slug === slug);
+};
 
 export const PRIZES: Record<string, Prize> = Object.fromEntries([
   P('stars1', 'stars', 'stars', 1, 'common'),
@@ -42,28 +79,13 @@ export const PRIZES: Record<string, Prize> = Object.fromEntries([
   P('prem3', 'premium', 'crown', 1000, 'mythic', 3),
   P('prem6', 'premium', 'crown', 1500, 'mythic', 6),
   P('prem12', 'premium', 'crown', 2500, 'mythic', 12),
-  // NFT tiers: nominal value used for odds/RTP; the concrete NFT (and its exact value) comes from stock
-  P('nft_s', 'nft', 'diamond', 1500, 'mythic'),
-  P('nft_m', 'nft', 'diamond', 4000, 'mythic'),
-  P('nft_l', 'nft', 'diamond', 10000, 'mythic'),
-  P('nft_xl', 'nft', 'diamond', 25000, 'mythic'),
+  ...NFT_PRIZES,
 ].map((p) => [p.id, p]));
 
 /** Emoji of the matching regular Telegram gift (resolved to gift_id via getAvailableGifts). */
 export const GIFT_EMOJI: Record<string, string> = {
   heart: '💝', bear: '🧸', rose: '🌹', gift: '🎁', cake: '🎂', rocket: '🚀', cup: '🏆', ring: '💍', diamond: '💎',
 };
-
-/** NFT tiers: admin-stocked unique gifts are assigned to a tier by their value (Stars). */
-export const NFT_TIERS = {
-  nft_s: { min: 800, max: 2500 },
-  nft_m: { min: 2501, max: 6000 },
-  nft_l: { min: 6001, max: 15000 },
-  nft_xl: { min: 15001, max: 40000 },
-} as const;
-export type NftTier = keyof typeof NFT_TIERS;
-export const nftTierFor = (value: number): NftTier | null =>
-  (Object.keys(NFT_TIERS) as NftTier[]).find((k) => value >= NFT_TIERS[k].min && value <= NFT_TIERS[k].max) ?? null;
 
 /** Luck card: up to +10% weight on drops worth ≥ the case price, only on cheap paid cases. */
 export const LUCK = { maxPct: 10, maxCasePrice: 50 } as const;
@@ -98,14 +120,20 @@ export const CASES: CaseDef[] = [
     drops: d({ stars1000: 56.3, prem6: 60, stars2500: 150, prem12: 300, stars5000: 400, stars10000: 160 }) },
 ];
 
-/** NFT tier weights per case — added only while that tier is in stock; a tier is only used where price < nominal ≤ 10× price. */
-export const NFT_DROPS: Record<string, Partial<Record<NftTier, number>>> = {
-  star: { nft_s: 3.02 },
-  aurora: { nft_m: 6.39, nft_l: 1.47 },
-  phantom: { nft_m: 13.15, nft_l: 2.3, nft_xl: 0.44 },
-  king: { nft_l: 5.99, nft_xl: 1.92 },
-  diamond: { nft_s: 5.72, nft_m: 1.29 },
-  legend: { nft_s: 11.88, nft_m: 3.02, nft_l: 0.83 },
+/**
+ * NFT collection weights per case — a drop is live only while that collection is in stock (admin-controlled).
+ * Every NFT sits only where case price < value ≤ 10× price; weights ∝ 1/value (each NFT adds the same EV) and
+ * scaled by worker/scripts/solve-nft.ts so the case RTP with all NFTs in stock stays ≤ 87.8% (base 85.2–86.5%).
+ */
+export const NFT_DROPS: Record<string, Record<string, number>> = {
+  neon: { nft_hypno: 0.145, nft_jackbox: 0.145 },
+  ghost: { nft_hypno: 0.988, nft_jackbox: 0.988, nft_hexpot: 0.733, nft_witchhat: 0.733, nft_candle: 0.733, nft_evileye: 0.538 },
+  star: { nft_hexpot: 1.11, nft_witchhat: 1.11, nft_candle: 1.11, nft_evileye: 0.813, nft_skullflower: 0.595, nft_crystal: 0.522, nft_pumpkin: 0.469 },
+  diamond: { nft_evileye: 2.56, nft_skullflower: 1.87, nft_crystal: 1.64, nft_pumpkin: 1.47, nft_eskull: 0.801, nft_voodoo: 0.573 },
+  legend: { nft_skullflower: 5.78, nft_crystal: 5.08, nft_pumpkin: 4.56, nft_eskull: 2.48, nft_voodoo: 1.77, nft_potion: 1.19 },
+  aurora: { nft_eskull: 3.98, nft_voodoo: 2.85, nft_potion: 1.91, nft_astral: 0.835 },
+  phantom: { nft_voodoo: 3.96, nft_potion: 2.66, nft_astral: 1.16, nft_scaredcat: 0.609 },
+  king: { nft_potion: 4.61, nft_astral: 2.01, nft_scaredcat: 1.05, nft_durovcap: 0.714 },
 };
 
 /** Static (base) case — used for first paint and by the mock. */
@@ -121,7 +149,8 @@ export function liveDrops(c: CaseDef, opts: { nftInStock?: Iterable<string>; luc
   const nft = Object.entries(NFT_DROPS[c.id] ?? {}).filter(([k]) => stock.has(k)).map(([prize, weight]) => ({ prize, weight: weight as number }));
   const luck = c.price > 0 && c.price <= LUCK.maxCasePrice ? Math.max(0, Math.min(LUCK.maxPct, opts.luckPct ?? 0)) / 100 : 0;
   const drops = [...base, ...nft];
-  return luck ? drops.map((x) => (PRIZES[x.prize].value >= c.price ? { prize: x.prize, weight: +(x.weight * (1 + luck)).toFixed(4) } : x)) : drops;
+  // luck never touches NFT drops (stock-limited, admin-bought)
+  return luck ? drops.map((x) => (PRIZES[x.prize].value >= c.price && PRIZES[x.prize].kind !== 'nft' ? { prize: x.prize, weight: +(x.weight * (1 + luck)).toFixed(4) } : x)) : drops;
 }
 const BASE_DROPS = new Map(CASES.map((c) => [c.id, c.drops.slice()]));
 

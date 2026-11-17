@@ -103,7 +103,7 @@ export const httpApi: GameApi = {
     return r;
   },
   async withdraw(uid) {
-    const r = await req<{ status: 'queued'; review?: boolean }>('/v1/withdraw', { body: { uid }, key: newKey() });
+    const r = await req<{ status: 'queued'; review?: boolean; manual?: boolean }>('/v1/withdraw', { body: { uid }, key: newKey() });
     const it = C.inv.find((x) => x.uid === uid);
     if (it) it.status = 'withdrawing';
     sync();

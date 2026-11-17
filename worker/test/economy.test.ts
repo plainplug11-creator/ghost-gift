@@ -12,7 +12,7 @@ describe('economy tables', () => {
         expect(rtp).toBeGreaterThan(0.85);
         expect(rtp).toBeLessThanOrEqual(0.88);
       }
-      for (const k of nft) expect(PRIZES[k].value).toBeGreaterThan(c.price);
+      for (const k of nft) { expect(PRIZES[k].value).toBeGreaterThan(c.price); expect(PRIZES[k].value).toBeLessThanOrEqual(10 * c.price); }
     });
   }
   it('the daily case is cheap and every drop exists', () => {

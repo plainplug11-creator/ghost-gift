@@ -2,6 +2,7 @@ import { AuthError, verifyInitData, type TelegramUser } from './auth.ts';
 import { handleUpdate } from './bot.ts';
 import type { Config } from './config.ts';
 import { CASES, NFT_DROPS, PRIZES, PREMIUM_TIERS, bankFilter, caseById, isBigPrize, liveDrops, type CaseDrop, type Prize } from './catalog.ts';
+import { nftInfo } from './nft.ts';
 import { randomHex } from './crypto.ts';
 import { ownerConnection, type Ctx } from './ctx.ts';
 import { Tx, isConflict, todayKyiv } from './db.ts';
@@ -12,7 +13,7 @@ import { createTopup, invoiceStatus } from './payments.ts';
 import { hitRateLimit, inspectSpinTiming, recordFingerprint } from './risk.ts';
 import { Tg, type TgApi } from './telegram.ts';
 import { ApiError, getOrCreateUser, ledger, mustUser, type UserRow } from './users.ts';
-import { notifyAdminReview } from './withdrawals.ts';
+import { notifyAdminNftWon, notifyAdminReview } from './withdrawals.ts';
 
 export { ApiError };
 
@@ -37,6 +38,8 @@ const header = (h: Record<string, string>, k: string) => {
 type Mutation = (tx: Tx, firstAttempt: boolean) => Promise<unknown>;
 
 const bankReady = new WeakMap<D1Database, Promise<unknown>>();
+/** idempotent replays (no side effects such as admin DMs a second time) */
+const replayed = new WeakSet<object>();
 
 export function createApp(db: D1Database, cfg: Config, deps: Deps = {}) {
   const ctx: Ctx = {
@@ -71,7 +74,11 @@ export function createApp(db: D1Database, cfg: Config, deps: Deps = {}) {
       if (method === 'POST' && path === '/v1/bootstrap') return ok(await bootstrap(tgUser));
       if (method === 'GET' && path === '/v1/next-round') return ok(await nextRound(userId));
       if (method === 'GET' && path === '/v1/inventory') return ok({ inventory: await inventory(userId) });
-      if (method === 'POST' && path === '/v1/open') return ok(await mutate(userId, req, (tx, first) => openCase(tx, first, userId, json(req))));
+      if (method === 'POST' && path === '/v1/open') {
+        const out = await mutate(userId, req, (tx, first) => openCase(tx, first, userId, json(req))) as { roundId: string; demo: boolean; prize: Prize; itemUid?: string };
+        if (!out.demo && out.prize?.kind === 'nft' && out.itemUid && !replayed.has(out)) bg(notifyAdminNftWon(ctx, userId, out.itemUid));
+        return ok(out);
+      }
       if (method === 'POST' && path === '/v1/sell') return ok(await mutate(userId, req, (tx) => sell(tx, userId, json(req).uid)));
       if (method === 'POST' && path === '/v1/withdraw') return ok(await withdrawFlow(userId, req));
       if (method === 'POST' && path === '/v1/buy-premium') return ok(await premiumFlow(userId, req));
@@ -119,7 +126,7 @@ export function createApp(db: D1Database, cfg: Config, deps: Deps = {}) {
     for (let attempt = 0; ; attempt++) {
       if (key) {
         const hit = await db.prepare('SELECT response FROM idempotency WHERE user_id = ? AND key = ?').bind(userId, key).first<{ response: string }>();
-        if (hit) return JSON.parse(hit.response);
+        if (hit) { const prev = JSON.parse(hit.response); if (prev && typeof prev === 'object') replayed.add(prev); return prev; }
       }
       const tx = new Tx(db);
       const out = await fn(tx, attempt === 0);
@@ -163,7 +170,7 @@ export function createApp(db: D1Database, cfg: Config, deps: Deps = {}) {
     return (r.results ?? []).map(({ value, title, name, ...it }) => ({
       ...it,
       ...(value != null ? { value } : {}),
-      ...(title ? { nft: { title, name: name ?? '', link: `https://t.me/nft/${name ?? ''}` } } : {}),
+      ...(PRIZES[it.prizeId]?.kind === 'nft' ? { nft: nftInfo(it.prizeId, title ? { title, name } : null) } : {}),
     }));
   }
 
@@ -207,7 +214,7 @@ export function createApp(db: D1Database, cfg: Config, deps: Deps = {}) {
     let nft: { id: number; title: string; name: string; value: number } | null = null;
     if (prize.kind === 'nft') {
       const nominal = prize.value;
-      nft = await db.prepare("SELECT id, title, name, value FROM nft_stock WHERE tier = ? AND status = 'in_stock' ORDER BY ABS(value - ?) LIMIT 1")
+      nft = await db.prepare("SELECT id, title, name, value FROM nft_stock WHERE tier = ? AND status = 'in_stock' ORDER BY ABS(value - ?), id LIMIT 1")
         .bind(prize.id, nominal).first<{ id: number; title: string; name: string; value: number }>();
       if (!nft) { // sold out between table build and pick → same roll on the table without NFT tiers
         drops = drops.filter((d) => PRIZES[d.prize].kind !== 'nft');
@@ -215,7 +222,7 @@ export function createApp(db: D1Database, cfg: Config, deps: Deps = {}) {
       }
     }
     const value = nft ? nft.value : prize.value;
-    const shown: Prize = nft ? { ...prize, value, nft: { title: nft.title, name: nft.name, link: `https://t.me/nft/${nft.name}` } } : { ...prize };
+    const shown: Prize = nft ? { ...prize, value, nft: nftInfo(prize.id, nft) } : { ...prize };
     const nextSeed = newSeed();
     const now = Date.now();
     const roundId = id(8);
@@ -288,9 +295,9 @@ export function createApp(db: D1Database, cfg: Config, deps: Deps = {}) {
   }
 
   async function withdrawFlow(userId: string, req: AppReq) {
-    const out = await mutate(userId, req, (tx) => withdraw(tx, userId, json(req).uid)) as { status: 'queued'; review: boolean; withdrawalId?: string; deliveryId?: string; fresh?: boolean };
-    afterWithdrawal(out);
-    return { status: out.status, review: out.review };
+    const out = await mutate(userId, req, (tx) => withdraw(tx, userId, json(req).uid)) as { status: 'queued'; review: boolean; manual?: boolean; withdrawalId?: string; deliveryId?: string; fresh?: boolean };
+    if (!replayed.has(out)) afterWithdrawal(out);
+    return { status: out.status, review: out.review, ...(out.manual ? { manual: true } : {}) };
   }
 
   function afterWithdrawal(out: { review: boolean; withdrawalId?: string; deliveryId?: string; fresh?: boolean }) {
@@ -304,11 +311,13 @@ export function createApp(db: D1Database, cfg: Config, deps: Deps = {}) {
     const prize = PRIZES[it.prizeId];
     if (!prize || prize.kind === 'stars') throw new ApiError(404, 'NOT_FOUND');
     const kind = prize.kind === 'premium' ? 'premium' : prize.kind === 'nft' ? 'nft' : 'gift';
-    if (kind === 'nft' && !(await ownerConnection(ctx))) throw new ApiError(409, 'NFT_PENDING');
+    const manualNft = kind === 'nft' && cfg.nftDelivery === 'manual';
+    if (kind === 'nft' && !manualNft && !(await ownerConnection(ctx))) throw new ApiError(409, 'NFT_PENDING');
     const value = it.value ?? prize.value;
     const u = await mustUser(db, userId);
     const reasons = reviewReasons(u, value, kind);
-    const status = reasons.length ? 'review' : 'approved';
+    // manual NFT: straight to the admin's hand-delivery card (it shows the same risk info) — one tap instead of two
+    const status = reasons.length && !manualNft ? 'review' : 'approved';
     const wid = id(8);
     tx.guardUser(userId, u.version);
     tx.add("INSERT INTO tx_guard (n) SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM inventory WHERE uid = ? AND status = 'owned')", uid);
@@ -318,14 +327,14 @@ export function createApp(db: D1Database, cfg: Config, deps: Deps = {}) {
     const deliveryId = status === 'approved'
       ? enqueueDelivery(tx, { withdrawalId: wid, userId, kind, prizeId: prize.id, months: prize.months ?? null, nftId: it.nftId, cost: kind === 'premium' ? PREMIUM_STARS[prize.months ?? 3] : value })
       : undefined;
-    log('info', 'withdraw', { user: userId, prize: prize.id, status, reasons: reasons.join(',') });
-    return { status: 'queued' as const, review: status === 'review', withdrawalId: wid, deliveryId, fresh: true };
+    log('info', 'withdraw', { user: userId, prize: prize.id, status, reasons: reasons.join(','), manualNft });
+    return { status: 'queued' as const, review: status === 'review', manual: manualNft, withdrawalId: wid, deliveryId, fresh: true };
   }
 
   async function premiumFlow(userId: string, req: AppReq) {
     const body = json(req);
     const out = await mutate(userId, req, (tx) => buyPremium(tx, userId, body.months)) as { status: 'queued'; balance: number; review: boolean; withdrawalId?: string; deliveryId?: string; fresh?: boolean };
-    afterWithdrawal(out);
+    if (!replayed.has(out)) afterWithdrawal(out);
     return { status: out.status, balance: out.balance, review: out.review };
   }
 

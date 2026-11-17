@@ -5,6 +5,7 @@ import { adminIds, ownerConnection, type Ctx } from './ctx.ts';
 import { log } from './log.ts';
 import { TgError } from './telegram.ts';
 import { esc, itemName, tx as text } from './texts.ts';
+import { nftCollection } from './catalog.ts';
 
 export const PREMIUM_STARS: Record<number, number> = { 3: 1000, 6: 1500, 12: 2500 };
 const MAX_ATTEMPTS = 8;
@@ -72,6 +73,14 @@ export async function processDelivery(ctx: Ctx, id: string): Promise<string> {
       await notifyUser(ctx, d.user_id, 'delivered_premium', { m: months });
     } else {
       if (!nft) return fail(ctx, d, 'failed', 'nft_missing');
+      if (ctx.cfg.nftDelivery === 'manual') {
+        // Hand delivery: park it as 'manual' (cron ignores it), DM the admin a card with Выдано / Отклонить.
+        await ctx.db.prepare("UPDATE deliveries SET status = 'manual', last_error = NULL, updated_at = ? WHERE id = ?").bind(Date.now(), d.id).run();
+        await notifyAdminManualNft(ctx, d.id);
+        await notifyUser(ctx, d.user_id, 'nft_sending', { item: name });
+        log('info', 'delivery_manual', { id: d.id, prize: d.prize_id, user: d.user_id });
+        return 'manual';
+      }
       const conn = await ownerConnection(ctx);
       if (!conn) return wait(ctx, d, 'waiting_business', 'business_not_connected', 30 * 60_000);
       const owned = await findOwnedUnique(ctx, conn.id, nft.owned_gift_id);
@@ -178,4 +187,39 @@ export async function cronTick(ctx: Ctx, limit = 5) {
   ]);
   log('info', 'cron', { delivered: results.filter((x) => x === 'delivered').length, processed: results.length, stuck: stuck.results?.length ?? 0 });
   return results;
+}
+
+/** Admin card for a hand-delivered NFT: who, what, where to buy, and the two decisions. */
+export async function notifyAdminManualNft(ctx: Ctx, did: string) {
+  const d = await ctx.db.prepare('SELECT * FROM deliveries WHERE id = ?').bind(did).first<DeliveryRow>();
+  if (!d) return;
+  const [w, nft, u, dep] = await Promise.all([
+    ctx.db.prepare('SELECT value, reason FROM withdrawals WHERE id = ?').bind(d.withdrawal_id).first<{ value: number; reason: string | null }>(),
+    d.nft_id ? ctx.db.prepare('SELECT title, name FROM nft_stock WHERE id = ?').bind(d.nft_id).first<{ title: string; name: string }>() : null,
+    ctx.db.prepare('SELECT tg_username, tg_first_name, risk_score, flagged, created_at, stats_opens FROM users WHERE id = ?').bind(d.user_id)
+      .first<{ tg_username: string | null; tg_first_name: string | null; risk_score: number; flagged: number; created_at: number; stats_opens: number }>(),
+    ctx.db.prepare('SELECT COALESCE(SUM(stars), 0) AS s FROM payments WHERE user_id = ? AND refunded = 0').bind(d.user_id).first<{ s: number }>(),
+  ]);
+  const col = nftCollection(d.prize_id);
+  const value = w?.value ?? col?.value ?? 0;
+  const who = u?.tg_username ? `@${esc(u.tg_username)}` : esc(u?.tg_first_name || d.user_id);
+  const ageH = u ? Math.round((Date.now() - u.created_at) / 3600_000) : 0;
+  const concrete = nft?.name ? `<a href="https://t.me/nft/${esc(nft.name)}">${esc(nft.title)}</a>` : null;
+  const how = concrete
+    ? `Передай ${concrete} из своего профиля этому игроку.`
+    : `Купи любой <b>${esc(col?.title ?? 'NFT')}</b> по флору (≈ ${col?.floorTon ?? '?'}–${col?.fragmentTon ?? '?'} TON) и передай игроку.`;
+  const body = `💎 <b>Выдай NFT вручную</b>\n`
+    + `🎁 ${esc(itemName(d.prize_id, nft?.title ?? col?.title))} · <b>${value} ⭐</b>\n`
+    + `👤 Кому: <a href="tg://user?id=${d.user_id}">${who}</a> (<code>${d.user_id}</code>)\n`
+    + `📊 Риск ${u?.risk_score ?? 0}${u?.flagged ? ' 🚩' : ''} · аккаунту ${ageH} ч · открытий ${u?.stats_opens ?? 0} · пополнил ${dep?.s ?? 0} ⭐${w?.reason ? ` · ${esc(w.reason)}` : ''}\n\n`
+    + `${how}\nПотом нажми «✅ Выдано» — игроку придёт уведомление. «Отклонить» вернёт ему ${value} ⭐ на баланс.\n<code>${d.id}</code>`;
+  const rows: { text: string; callback_data?: string; url?: string }[][] = [
+    [{ text: '✅ Выдано', callback_data: `dd:${d.id}` }, { text: `↩️ Отклонить (+${value}⭐)`, callback_data: `dx:${d.id}` }],
+  ];
+  if (col && !concrete) rows.push([{ text: `🛒 ${col.title} на Fragment`, url: `https://fragment.com/gifts/${col.slug}?sort=price_asc` }]);
+  for (const a of await adminIds(ctx)) {
+    try { await ctx.tg.call('sendMessage', { chat_id: Number(a), text: body, parse_mode: 'HTML', link_preview_options: { is_disabled: true }, reply_markup: { inline_keyboard: rows } }); }
+    catch (e) { log('warn', 'admin_manual_nft_notify_failed', { err: String(e) }); }
+  }
+  await ctx.db.prepare('UPDATE deliveries SET admin_notified = 1 WHERE id = ?').bind(d.id).run();
 }

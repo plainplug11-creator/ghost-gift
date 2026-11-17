@@ -1,3 +1,4 @@
+import { nftCollection } from './catalog.ts';
 import { adminIds, type Ctx } from './ctx.ts';
 import { PREMIUM_STARS, enqueueDelivery, notifyUser, processDelivery, type DeliveryRow } from './delivery.ts';
 import { log } from './log.ts';
@@ -32,6 +33,23 @@ export async function notifyAdminReview(ctx: Ctx, wid: string) {
   }
 }
 
+/** Heads-up for the admin the moment an NFT drops (the player may still sell it back instead of claiming). */
+export async function notifyAdminNftWon(ctx: Ctx, userId: string, itemUid: string) {
+  const it = await ctx.db.prepare(`SELECT i.prize_id, i.case_id, i.value, n.title FROM inventory i LEFT JOIN nft_stock n ON n.id = i.nft_id WHERE i.uid = ?`).bind(itemUid)
+    .first<{ prize_id: string; case_id: string; value: number | null; title: string | null }>();
+  if (!it) return;
+  const u = await ctx.db.prepare('SELECT tg_username, tg_first_name FROM users WHERE id = ?').bind(userId).first<{ tg_username: string | null; tg_first_name: string | null }>();
+  const who = u?.tg_username ? `@${esc(u.tg_username)}` : esc(u?.tg_first_name || userId);
+  const col = nftCollection(it.prize_id);
+  const left = await ctx.db.prepare("SELECT COUNT(*) AS n FROM nft_stock WHERE tier = ? AND status = 'in_stock'").bind(it.prize_id).first<{ n: number }>();
+  const text = `🎉 <b>Выпал NFT!</b> ${esc(itemName(it.prize_id, it.title ?? col?.title))} · ${it.value ?? col?.value ?? 0} ⭐\n`
+    + `Игрок <a href="tg://user?id=${userId}">${who}</a> (<code>${userId}</code>), кейс ${esc(it.case_id)}. Осталось на складе: ${left?.n ?? 0}.\n`
+    + `Если игрок заберёт его, придёт карточка выдачи с кнопками. Если продаст, NFT вернётся на склад.`;
+  for (const a of await adminIds(ctx)) {
+    try { await ctx.tg.call('sendMessage', { chat_id: Number(a), text, parse_mode: 'HTML' }); } catch (e) { log('warn', 'admin_nft_won_notify_failed', { err: String(e) }); }
+  }
+}
+
 export async function approveWithdrawal(ctx: Ctx, wid: string, by: string): Promise<{ ok: boolean; msg: string; deliveryId?: string }> {
   const res = await withRetry(ctx.db, async (tx) => {
     const w = await getW(ctx, wid);
@@ -63,13 +81,19 @@ export async function rejectWithdrawal(ctx: Ctx, wid: string, by: string): Promi
     tx.add("UPDATE withdrawals SET status = 'rejected', decided_by = ?, decided_at = ? WHERE id = ?", by, Date.now(), wid);
     tx.add("UPDATE deliveries SET status = 'cancelled', updated_at = ? WHERE withdrawal_id = ?", Date.now(), wid);
     if (w.item_uid.startsWith('prem:')) creditRelative(tx, w.user_id, w.paid, 'premium_refund', wid);
-    else tx.add("UPDATE inventory SET status = 'owned' WHERE uid = ? AND status = 'withdrawing'", w.item_uid);
-    return { ok: true, msg: 'отклонено', w };
+    else if (w.kind === 'nft') {
+      // NFT that can't be handed over → its full value in Stars; the stock unit becomes available again
+      creditRelative(tx, w.user_id, w.value, 'nft_refund', wid);
+      tx.add("UPDATE inventory SET status = 'refunded' WHERE uid = ? AND status = 'withdrawing'", w.item_uid);
+      if (w.nft_id) tx.add("UPDATE nft_stock SET status = 'in_stock', item_uid = NULL WHERE id = ? AND status = 'reserved'", w.nft_id);
+    } else tx.add("UPDATE inventory SET status = 'owned' WHERE uid = ? AND status = 'withdrawing'", w.item_uid);
+    return { ok: true, msg: w.kind === 'nft' ? `отклонено, игроку +${w.value}⭐` : 'отклонено', w };
   });
   if (res.w) {
     log('info', 'withdrawal_rejected', { wid, by });
     const w = res.w;
     if (w.item_uid.startsWith('prem:')) await notifyUser(ctx, w.user_id, 'rejected_premium', { n: w.paid });
+    else if (w.kind === 'nft') await notifyUser(ctx, w.user_id, 'rejected_nft', { item: itemName(w.prize_id, (await nftTitle(ctx, w.nft_id)) ?? nftCollection(w.prize_id)?.title), n: w.value });
     else await notifyUser(ctx, w.user_id, 'rejected_item', { item: itemName(w.prize_id, await nftTitle(ctx, w.nft_id)) });
   }
   return { ok: res.ok, msg: res.msg };
@@ -86,7 +110,7 @@ export async function retryDelivery(ctx: Ctx, did: string) {
 }
 
 export async function markDeliveredManually(ctx: Ctx, did: string) {
-  const d = await ctx.db.prepare("SELECT * FROM deliveries WHERE id = ? AND status IN ('unknown','failed','waiting_funds','waiting_business')").bind(did).first<DeliveryRow>();
+  const d = await ctx.db.prepare("SELECT * FROM deliveries WHERE id = ? AND status IN ('manual','unknown','failed','waiting_funds','waiting_business')").bind(did).first<DeliveryRow>();
   if (!d) return { ok: false, msg: 'нельзя' };
   const now = Date.now();
   const w = await getW(ctx, d.withdrawal_id);
@@ -96,8 +120,14 @@ export async function markDeliveredManually(ctx: Ctx, did: string) {
   ];
   if (w && !w.item_uid.startsWith('prem:')) stmts.push(ctx.db.prepare("UPDATE inventory SET status = 'delivered' WHERE uid = ?").bind(w.item_uid));
   if (d.nft_id) stmts.push(ctx.db.prepare("UPDATE nft_stock SET status = 'delivered', delivered_at = ? WHERE id = ?").bind(now, d.nft_id));
-  await ctx.db.batch(stmts);
-  return { ok: true, msg: 'отмечено доставленным' };
+  stmts.unshift(ctx.db.prepare(`INSERT INTO tx_guard (n) SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM deliveries WHERE id = ? AND status IN ('manual','unknown','failed','waiting_funds','waiting_business'))`).bind(did));
+  try { await ctx.db.batch(stmts); } catch { return { ok: false, msg: 'уже обработано' }; }
+  const title = d.nft_id ? await nftTitle(ctx, d.nft_id) : null;
+  const item = itemName(d.prize_id, title ?? nftCollection(d.prize_id)?.title);
+  if (d.kind === 'nft') await notifyUser(ctx, d.user_id, 'delivered_nft', { item });
+  else if (d.kind === 'premium') await notifyUser(ctx, d.user_id, 'delivered_premium', { m: d.months ?? 3 });
+  else await notifyUser(ctx, d.user_id, 'delivered_gift', { item });
+  return { ok: true, msg: d.kind === 'nft' ? 'выдано, игрок уведомлён' : 'отмечено доставленным' };
 }
 
 export async function rejectByDelivery(ctx: Ctx, did: string, by: string) {

@@ -9,7 +9,7 @@ import { api } from '../api';
 import { apiErrorText } from '../api/errors';
 import { PREMIUM_TIERS, PRIZES } from '../api/catalog';
 import type { InvItem, Prize } from '../api/types';
-import { RARITY_RGB, isNft, isPremium, itemPrize, kindCls, markReview, nftOf, reviewSet, prizeIcon, prizeName, rarityName } from '../art/cases';
+import { RARITY_RGB, isNft, isNftCollection, isPremium, itemPrize, kindCls, markReview, nftOf, reviewSet, prizeIcon, prizeName, rarityName } from '../art/cases';
 import { MASCOT_URL } from '../ui/header';
 import { openSheet, toast } from '../ui/sheet';
 import prizesUrl from '../assets/prizes.webp';
@@ -133,11 +133,15 @@ export function openItem(it: InvItem) {
       html(`<span class="it-ico">${prizeIcon(p, 'big')}</span>`),
       h('div', { class: 'it-n' }, prizeName(p)),
       html(`<div class="rs-meta"><span class="rs-r">${isNft(p) ? t('nft.unique') : isPremium(p) ? t('prem.kind') : rarityName(p)}</span><span class="rs-v">${fmt(p.value)}${starIcon('star-ico')}</span></div>`),
-      pending ? h('span', { class: `inv-pending${reviewSet().has(it.uid) ? ' is-review' : ''}` }, reviewSet().has(it.uid) ? t('inv.review') : t('inv.pending')) : null,
+      isNftCollection(p) ? h('p', { class: 'it-anymodel' }, t('nft.anyModel')) : null,
+      pending ? (isNft(p) && !reviewSet().has(it.uid)
+        ? h('span', { class: 'inv-pending is-nft' }, t('nft.sending'))
+        : h('span', { class: `inv-pending${reviewSet().has(it.uid) ? ' is-review' : ''}` }, reviewSet().has(it.uid) ? t('inv.review') : t('inv.pending'))) : null,
+      pending && isNft(p) && !reviewSet().has(it.uid) ? h('p', { class: 'it-review' }, t('nft.sendingNote')) : null,
       pending && reviewSet().has(it.uid) ? h('p', { class: 'it-review' }, t('inv.reviewNote')) : null),
     h('div', { class: 'it-actions' },
-      btn(isPremium(p) ? t('inv.withdrawPremium') : t('inv.withdraw'), 'btn-primary', async () => {
-        try { const r = await api.withdraw(it.uid); tg.haptic.success(); if (r.review) { markReview(it.uid); toast(t('inv.reviewToast'), 'info'); } else toast(t('inv.queued')); s.close(); }
+      btn(isPremium(p) ? t('inv.withdrawPremium') : isNft(p) ? t('nft.claim') : t('inv.withdraw'), 'btn-primary', async () => {
+        try { const r = await api.withdraw(it.uid); tg.haptic.success(); if (r.review) { markReview(it.uid); toast(t('inv.reviewToast'), 'info'); } else toast(r.manual || isNft(p) ? t('nft.sendingToast') : t('inv.queued')); s.close(); }
         catch (e) { tg.haptic.error(); toast(apiErrorText(e), 'err'); }
       }, pending),
       btn(sellLabel, 'btn-ghost', async () => {
@@ -145,7 +149,7 @@ export function openItem(it: InvItem) {
         catch (e) { tg.haptic.error(); toast(apiErrorText(e), 'err'); }
       }, pending),
       isPremium(p) ? null : btn(t('inv.premium'), 'btn-ghost', () => { s.close().then(openPremium); }),
-      nftLink && /^https:\/\/t\.me\//.test(nftLink) ? btn(t('nft.view'), 'btn-text', () => tg.open(nftLink)) : null,
+      nftLink && /^https:\/\/(t\.me|fragment\.com)\//.test(nftLink) ? btn(isNftCollection(p) ? t('nft.viewCollection') : t('nft.view'), 'btn-text', () => tg.open(nftLink)) : null,
       btn(t('inv.keep'), 'btn-text', () => s.close()),
     ),
     h('p', { class: 'rl-note' }, t('inv.note')),

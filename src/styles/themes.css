@@ -238,3 +238,11 @@ html:not([data-tier="low"]):not(.reduce-motion) .k-nft::after { animation: nft-f
 @keyframes rv-pulse { 50% { box-shadow: 0 0 20px rgba(255,79,216,.55); } }
 .it-review { margin: 10px 4px 0; font-size: 12.5px; line-height: 1.45; color: rgba(255,255,255,.7); text-align: center; }
 @media (prefers-reduced-motion: reduce) { .inv-pending.is-review { animation: none; } }
+
+/* NFT collection prizes: "any model" note + hand-delivery status */
+.rs-any, .it-anymodel { margin: 4px 0 0; font-size: 12.5px; line-height: 1.35; font-weight: 600; color: rgba(225, 214, 255, 0.82); text-align: inherit; }
+.it-anymodel { text-align: center; max-width: 300px; margin: 6px auto 0; }
+.inv-pending.is-nft { color: #fff; border-color: transparent; background: linear-gradient(90deg, #46e6ff, #a65cff 55%, #ff5ccc); box-shadow: 0 0 14px rgba(166, 92, 255, 0.6); }
+html:not([data-tier="low"]):not(.reduce-motion) .inv-pending.is-nft { background-size: 200% 100%; animation: nft-sending 2.4s linear infinite; }
+@keyframes nft-sending { to { background-position: -200% 0; } }
+.inv-it .inv-pending.is-nft { left: 6px; right: 6px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

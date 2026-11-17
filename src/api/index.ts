@@ -13,7 +13,7 @@
  */
 import type { CaseDef, Fairness, InvItem, OpenResult } from './types';
 export { ApiError } from './types';
-import { mockApi } from './mock';
+import { mockApi, mockNftStock } from './mock';
 import { httpApi } from './http';
 
 export interface GameApi {
@@ -25,7 +25,7 @@ export interface GameApi {
   commit(): void;
   sell(uid: string): Promise<{ balance: number; credited: number }>;
   /** review=true: a moderator checks it first (large / NFT / new account). Throws NFT_PENDING while NFT delivery is unavailable. */
-  withdraw(uid: string): Promise<{ status: 'queued'; review?: boolean }>;
+  withdraw(uid: string): Promise<{ status: 'queued'; review?: boolean; manual?: boolean }>;
   buyPremium(months: 3 | 6 | 12): Promise<{ status: 'queued'; balance: number }>;
   /**
    * Buy Ghost Stars with Telegram Stars (XTR invoice inside Telegram).
@@ -38,3 +38,4 @@ export interface GameApi {
 }
 
 export const api: GameApi = import.meta.env.VITE_API_URL ? httpApi : mockApi;
+if (!import.meta.env.VITE_API_URL) mockNftStock();

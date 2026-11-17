@@ -1,4 +1,4 @@
-import { CASES, PRIZES, PREMIUM_TIERS, caseById } from './catalog';
+import { CASES, NFT_DROPS, PRIZES, PREMIUM_TIERS, caseById, liveDrops } from './catalog';
 import type { GameApi } from './index';
 import { ApiError } from './types';
 import type { Fairness, InvItem, OpenResult, Prize } from './types';
@@ -16,6 +16,11 @@ import { store } from '../core/store';
  * hooks (hash before, seed after) are already in place.
  */
 const LS = 'gg.mock.v1';
+
+/** Mock mode shows every NFT collection as in stock (the real server lists only stocked ones). */
+export function mockNftStock() {
+  for (const c of CASES) c.drops = liveDrops(c, { nftInStock: Object.keys(NFT_DROPS[c.id] ?? {}) });
+}
 const DAY = 24 * 60 * 60 * 1000;
 
 interface State { balance: number; inv: InvItem[]; nonce: number; clientSeed: string; serverSeed: string; stats: { opens: number; wins: number; best: number } }
@@ -107,7 +112,7 @@ export const mockApi: GameApi = {
     const it = S.inv.find((x) => x.uid === uid && x.status === 'owned');
     if (!it) throw new ApiError('NOT_FOUND');
     it.status = 'withdrawing'; sync();
-    return { status: 'queued' as const };
+    return PRIZES[it.prizeId]?.kind === 'nft' ? { status: 'queued' as const, manual: true } : { status: 'queued' as const };
   },
   async buyPremium(months) {
     const tier = PREMIUM_TIERS.find((x) => x.months === months)!;

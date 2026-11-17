@@ -31,7 +31,7 @@ export function createInventory(): Page {
     grid.replaceChildren(...items.map((it, i) => {
       const p = itemPrize(it);
       const b = h('button', { class: `inv-it r-${p.rarity}${kindCls(p)}${it.status === 'withdrawing' ? ' is-pending' : ''}`, 'data-press': '', style: `--rc:${RARITY_RGB[p.rarity]};--i:${Math.min(i, 12)}` });
-      b.innerHTML = `<span class="inv-ico">${prizeIcon(p)}</span><span class="inv-n">${prizeName(p)}</span><span class="inv-r">${isNft(p) ? 'NFT' : isPremium(p) ? 'Premium' : rarityName(p)}</span><span class="inv-v">${fmt(p.value)}${starIcon('star-ico')}</span>${it.status === 'withdrawing' ? (review.has(it.uid) ? `<span class="inv-pending is-review">${t('inv.review')}</span>` : `<span class="inv-pending">${t('inv.pending')}</span>`) : ''}`;
+      b.innerHTML = `<span class="inv-ico">${prizeIcon(p)}</span><span class="inv-n">${prizeName(p)}</span><span class="inv-r">${isNft(p) ? 'NFT' : isPremium(p) ? 'Premium' : rarityName(p)}</span><span class="inv-v">${fmt(p.value)}${starIcon('star-ico')}</span>${it.status === 'withdrawing' ? (review.has(it.uid) ? `<span class="inv-pending is-review">${t('inv.review')}</span>` : isNft(p) ? `<span class="inv-pending is-nft">${t('nft.sending')}</span>` : `<span class="inv-pending">${t('inv.pending')}</span>`) : ''}`;
       b.addEventListener('click', () => openItem(it));
       return b;
     }));

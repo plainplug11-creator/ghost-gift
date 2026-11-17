@@ -23,7 +23,8 @@ export interface Prize {
   nft?: NftInfo;
 }
 
-export interface NftInfo { title: string; name: string; link: string }
+/** name = t.me/nft slug of a concrete gift ('' for a collection prize), art = Fragment preview slug (collection sample) */
+export interface NftInfo { title: string; name: string; link: string; art?: string }
 
 export interface CaseDrop { prize: string; weight: number }
 export interface CaseDef {

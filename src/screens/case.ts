@@ -9,7 +9,7 @@ import { api } from '../api';
 import { apiErrorText } from '../api/errors';
 import { caseById, caseStats } from '../api/catalog';
 import { RARITY_RANK, type OpenResult } from '../api/types';
-import { RARITY_RGB, caseImg, caseName, isNft, isPremium, kindCls, nftOf, prizeIcon, prizeName, rarityName } from '../art/cases';
+import { RARITY_RGB, caseImg, caseName, isNft, isNftCollection, isPremium, kindCls, nftOf, preloadNftArt, prizeIcon, prizeName, rarityName } from '../art/cases';
 import { navBar } from '../ui/nav';
 import { balancePill } from '../ui/header';
 import { openSheet, toast } from '../ui/sheet';
@@ -40,6 +40,7 @@ export function createCase(id: string): Page {
   const c = caseById(id)!;
   const isDaily = c.price === 0;
   const { rows, rtp } = caseStats(c);
+  preloadNftArt(rows.map((r) => r.prize)); // Fragment previews ready before the reel spins
   const bal = balancePill(false);
   const snd = soundToggle();
 
@@ -177,6 +178,16 @@ export function createCase(id: string): Page {
     } else if (p.kind === 'stars') {
       if (!isDaily) act(priceLabel(t('result.again'), c.price), 'btn-primary', () => open(false));
       act(t('common.done'), isDaily ? 'btn-primary' : 'btn-ghost', () => {});
+    } else if (isNft(p)) {
+      act(t('nft.claim'), 'btn-primary', async () => {
+        try { const r = await api.withdraw(res.itemUid!); tg.haptic.success(); toast(r.review ? t('inv.reviewToast') : t('nft.sendingToast'), 'info'); }
+        catch (e) { tg.haptic.error(); toast(apiErrorText(e), 'err'); }
+      });
+      act(priceLabel(t('result.sell'), p.value), 'btn-ghost', async () => {
+        try { const r = await api.sell(res.itemUid!); tg.haptic.success(); toast(t('result.sold', { n: fmt(r.credited) })); }
+        catch (e) { tg.haptic.error(); toast(apiErrorText(e), 'err'); }
+      });
+      act(t('result.toInv'), 'btn-ghost', () => toast(t('result.saved')));
     } else {
       act(t('result.toInv'), 'btn-primary', () => toast(t('result.saved')));
       act(priceLabel(t('result.sell'), p.value), 'btn-ghost', async () => {
@@ -187,8 +198,8 @@ export function createCase(id: string): Page {
     }
     const nftLink = nftOf(p)?.link;
     let nftBtn: HTMLElement | null = null;
-    if (nftLink && /^https:\/\/t\.me\//.test(nftLink)) {
-      nftBtn = h('button', { class: 'btn-text rs-nft', 'data-press': '' }, t('nft.view'));
+    if (nftLink && /^https:\/\/(t\.me|fragment\.com)\//.test(nftLink)) {
+      nftBtn = h('button', { class: 'btn-text rs-nft', 'data-press': '' }, isNftCollection(p) ? t('nft.viewCollection') : t('nft.view'));
       nftBtn.addEventListener('click', () => tg.open(nftLink));
     }
     if (!res.demo && rank >= 2) {
@@ -202,6 +213,7 @@ export function createCase(id: string): Page {
         h('div', { class: 'rs-fl' }, t(`fl.${th.key}` as I18nKey) || ''),
         h('div', { class: 'rs-k' }, res.demo ? t('result.demoNote') : p.kind === 'stars' ? t('result.credited') : t('result.title')),
         h('div', { class: 'rs-n' }, prizeName(p)),
+        isNftCollection(p) ? h('div', { class: 'rs-any' }, t('nft.anyModel')) : null,
         html(`<div class="rs-meta"><span class="rs-r">${isNft(p) ? 'NFT' : isPremium(p) ? 'Premium' : rarityName(p)}</span><span class="rs-v">${t('result.value')} · ${fmt(p.value)}${starIcon('star-ico')}</span></div>`)),
       btns[0]?.classList.contains('rs-share') ? btns.shift()! : null);
     const fair = h('div', { class: 'rs-fair' }, `#${res.fairness.nonce} · seed ${res.fairness.serverSeed?.slice(0, 8) ?? '—'}… · hash ${res.fairness.serverSeedHash.slice(0, 8)}…`);

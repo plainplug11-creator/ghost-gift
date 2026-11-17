@@ -45,7 +45,7 @@ export const caseImg = (c: CaseDef, cls = '', sizes = '150px') => {
  * inventory items; table entries (tiers nft_s/m/l) have no concrete NFT. Everything below degrades
  * gracefully when that data is missing (falls back to the atlas icon + holo frame).
  */
-type NftLike = { title?: string; name?: string; link?: string };
+type NftLike = { title?: string; name?: string; link?: string; art?: string };
 const kindOf = (p: Prize) => p.kind as string;
 export const isNft = (p: Prize) => kindOf(p) === 'nft';
 export const isPremium = (p: Prize) => kindOf(p) === 'premium';
@@ -56,7 +56,8 @@ export const kindCls = (p: Prize) => (isNft(p) ? ' k-nft' : isPremium(p) ? ' k-p
 const esc = (s: string) => s.replace(/'/g, '’').replace(/[<>&"`]/g, '');
 /** Fragment preview of a unique gift: t.me/nft/PlushPepe-123 → nft.fragment.com/gift/plushpepe-123.medium.jpg */
 export function nftPreview(n: NftLike | undefined, big = false) {
-  const slug = (n?.link?.split('/').filter(Boolean).pop() || n?.name || '').trim().toLowerCase();
+  // a collection prize carries a sample `art` slug; a concrete gift previews itself
+  const slug = (n?.art || (n?.name ? n.name : n?.link?.includes('t.me/nft/') ? n.link.split('/').filter(Boolean).pop() : '') || '').trim().toLowerCase();
   return /^[a-z0-9]+-\d+$/.test(slug) ? `https://nft.fragment.com/gift/${slug}.${big ? 'webp' : 'medium.jpg'}` : '';
 }
 
@@ -75,6 +76,17 @@ export const prizeIcon = (p: Prize, cls = '') => {
 const REVIEW_KEY = 'gg.review';
 export const reviewSet = (): Set<string> => { try { return new Set(JSON.parse(localStorage.getItem(REVIEW_KEY) || '[]')); } catch { return new Set(); } };
 export const markReview = (uid: string) => { const s = reviewSet(); s.add(uid); try { localStorage.setItem(REVIEW_KEY, JSON.stringify([...s].slice(-100))); } catch { /* private mode */ } };
+
+/** A collection prize ("any gift of this collection") vs a concrete numbered gift. */
+export const isNftCollection = (p: Prize) => isNft(p) && !nftOf(p)?.name;
+/** Fragment preview images used by a case (warm the cache before the reel spins). */
+export function preloadNftArt(prizes: Prize[]) {
+  for (const p of prizes) {
+    if (!isNft(p)) continue;
+    const src = nftPreview(nftOf(p));
+    if (src) { const i = new Image(); i.decoding = 'async'; i.referrerPolicy = 'no-referrer'; i.src = src; }
+  }
+}
 
 /** Display prize for an inventory item: catalog entry + server extras (concrete NFT, sell-back value). */
 export function itemPrize(it: InvItem): Prize {

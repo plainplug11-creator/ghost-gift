@@ -18,7 +18,7 @@ const DAYS = Number(process.argv[3] || 60);
 const pct = (x: number) => `${(x * 100).toFixed(2)}%`;
 let fail = false;
 
-console.log(`\n1) Per-case RTP / variance (NFT tiers counted as if in stock; luck = +${LUCK.maxPct}% on cases ≤ ${LUCK.maxCasePrice}⭐)`);
+console.log(`\n1) Per-case RTP / variance (NFT collections counted as if in stock; luck = +${LUCK.maxPct}% on cases ≤ ${LUCK.maxCasePrice}⭐)`);
 console.log('case      price   base     +NFT     +luck    MC(n)    σ/open(⭐)  σ/price  opens for 95% house-ahead');
 for (const c of CASES) {
   const all = Object.keys(NFT_DROPS[c.id] ?? {});
@@ -39,7 +39,7 @@ for (const c of CASES) {
     for (const r of [base.rtp, nft.rtp, luck.rtp]) if (r < 0.85 - 1e-9 || r > 0.88 + 1e-9) { fail = true; console.log(`  ✗ ${c.id} RTP ${pct(r)} outside 85–88%`); }
     for (const [k] of Object.entries(NFT_DROPS[c.id] ?? {})) {
       const v = PRIZES[k].value;
-      if (v <= c.price || v > 10 * c.price) { fail = true; console.log(`  ✗ ${c.id}: NFT tier ${k} must satisfy price < nominal ≤ 10×price`); }
+      if (v <= c.price || v > 10 * c.price) { fail = true; console.log(`  ✗ ${c.id}: NFT ${k} must satisfy price < value ≤ 10×price`); }
     }
   } else if (base.ev > 4) { fail = true; console.log('  ✗ daily EV too high'); }
 }
@@ -79,4 +79,4 @@ if (negatives > 0 || worstMin < 0) { fail = true; console.log('  ✗ bank went n
 if (finals[0] <= START) { fail = true; console.log('  ✗ a run ended with less than the starting bank'); }
 
 if (fail) { console.log('\nFAIL'); process.exit(1); }
-console.log('\nOK: every paid case 85–88% (base, with NFT stock, with max luck); NFT tiers only where price < nominal ≤ 10×; daily EV ≤ 4⭐; bank never negative and grows.');
+console.log('\nOK: every paid case 85–88% (base, with NFT stock, with max luck); NFT only where price < value ≤ 10×; daily EV ≤ 4⭐; bank never negative and grows.');

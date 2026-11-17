@@ -18,6 +18,7 @@ export interface Env {
   ADMIN_IDS?: string;
   ADMIN_CLAIM_CODE?: string;
   WEBAPP_URL?: string;
+  NFT_DELIVERY?: string;
 }
 
 export interface Config {
@@ -39,6 +40,8 @@ export interface Config {
   adminIds: string[];
   adminClaimCode: string;
   webAppUrl: string;
+  /** manual: the admin buys/transfers the NFT by hand (bot DMs a card); auto: transferGift via Business */
+  nftDelivery: 'manual' | 'auto';
 }
 
 export function loadConfig(env: Partial<Env>, overrides: Partial<Config> = {}): Config {
@@ -62,6 +65,7 @@ export function loadConfig(env: Partial<Env>, overrides: Partial<Config> = {}): 
     adminIds: (env.ADMIN_IDS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
     adminClaimCode: env.ADMIN_CLAIM_CODE || '',
     webAppUrl: env.WEBAPP_URL || 'https://plainplug11-creator.github.io/ghost-gift/',
+    nftDelivery: env.NFT_DELIVERY === 'auto' ? 'auto' : 'manual',
     ...overrides,
   };
 }

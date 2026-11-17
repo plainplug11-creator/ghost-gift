@@ -38,9 +38,9 @@ async function makeAdmin(a: App) {
 async function connectBusiness(a: App, rights: Record<string, boolean> = { can_view_gifts_and_stars: true, can_transfer_and_upgrade_gifts: true, can_transfer_stars: true }) {
   return hook(a, { update_id: Math.floor(Math.random() * 1e9), business_connection: { id: 'bc1', user: { id: Number(ADMIN) }, user_chat_id: Number(ADMIN), rights, is_enabled: true, date: 1 } });
 }
-async function addNft(a: App, tier: string, value: number, owned = `og-${Math.random()}`) {
-  const r = await a.db.prepare("INSERT INTO nft_stock (owned_gift_id, name, title, value, tier, transfer_cost, status, added_at) VALUES (?, 'PlushPepe-1', 'Plush Pepe #1', ?, ?, 25, 'in_stock', ?) RETURNING id")
-    .bind(owned, value, tier, Date.now()).first<{ id: number }>();
+async function addNft(a: App, tier: string, value: number, owned = `og-${Math.random()}`, name = 'MagicPotion-1', title = 'Magic Potion #1') {
+  const r = await a.db.prepare("INSERT INTO nft_stock (owned_gift_id, name, title, value, tier, transfer_cost, status, added_at) VALUES (?, ?, ?, ?, ?, 25, 'in_stock', ?) RETURNING id")
+    .bind(owned, name, title, value, tier, Date.now()).first<{ id: number }>();
   return r!.id;
 }
 const status = async (a: App, table: string, col: string, id: string | number) =>
@@ -219,32 +219,32 @@ describe('prize delivery', () => {
 });
 
 describe('NFT prizes', () => {
-  it('without a Business connection: 409 NFT_PENDING, item stays sellable and returns to stock', async () => {
-    const a = makeFlowApp();
+  it('auto mode without a Business connection: 409 NFT_PENDING, item stays sellable and returns to stock', async () => {
+    const a = makeFlowApp({ nftDelivery: 'auto' });
     await a.db.prepare("UPDATE business_connections SET enabled = 0").run();
     const u = await veteran(a);
-    const nftId = await addNft(a, 'nft_m', 4200);
+    const nftId = await addNft(a, 'nft_potion', 5970);
     await a.db.prepare("UPDATE nft_stock SET status = 'reserved' WHERE id = ?").bind(nftId).run();
-    const uid = await giveItem(a, u, 'nft_m', nftId, 4200);
+    const uid = await giveItem(a, u, 'nft_potion', nftId, 5970);
     const inv = (await req(a, 'GET', '/v1/inventory', u)).body.inventory;
-    expect(inv[0]).toMatchObject({ value: 4200, nft: { title: 'Plush Pepe #1', link: 'https://t.me/nft/PlushPepe-1' } });
+    expect(inv[0]).toMatchObject({ value: 5970, nft: { title: 'Magic Potion #1', link: 'https://t.me/nft/MagicPotion-1' } });
     expect((await req(a, 'POST', '/v1/withdraw', u, { uid })).body).toEqual({ error: 'NFT_PENDING' });
     const s = await req(a, 'POST', '/v1/sell', u, { uid });
-    expect(s.body).toEqual({ balance: 4200, credited: 4200 });
+    expect(s.body).toEqual({ balance: 5970, credited: 5970 });
     expect(await status(a, 'nft_stock', 'id', nftId)).toBe('in_stock');
     await a.db.prepare("UPDATE nft_stock SET status = 'removed' WHERE id = ?").bind(nftId).run();
   });
 
-  it('with the owner Business connection: review → approve → transferGift', async () => {
-    const a = makeFlowApp();
+  it('auto mode with the owner Business connection: review → approve → transferGift', async () => {
+    const a = makeFlowApp({ nftDelivery: 'auto' });
     await makeAdmin(a);
     await connectBusiness(a);
     const owned = 'owned-xyz';
-    a.tg.handlers.getBusinessAccountGifts = () => ({ total_count: 1, gifts: [{ type: 'unique', owned_gift_id: owned, can_be_transferred: true, transfer_star_count: 25, gift: { name: 'PlushPepe-1', base_name: 'Plush Pepe', number: 1 } }] });
+    a.tg.handlers.getBusinessAccountGifts = () => ({ total_count: 1, gifts: [{ type: 'unique', owned_gift_id: owned, can_be_transferred: true, transfer_star_count: 25, gift: { name: 'MagicPotion-1', base_name: 'Magic Potion', number: 1 } }] });
     const u = await veteran(a);
-    const nftId = await addNft(a, 'nft_l', 9000, owned);
+    const nftId = await addNft(a, 'nft_potion', 5970, owned);
     await a.db.prepare("UPDATE nft_stock SET status = 'reserved' WHERE id = ?").bind(nftId).run();
-    const uid = await giveItem(a, u, 'nft_l', nftId, 9000);
+    const uid = await giveItem(a, u, 'nft_potion', nftId, 5970);
     expect((await req(a, 'POST', '/v1/withdraw', u, { uid })).body).toEqual({ status: 'queued', review: true });
     const w = await a.db.prepare('SELECT id, reason FROM withdrawals WHERE item_uid = ?').bind(uid).first<{ id: string; reason: string }>();
     expect(w!.reason).toContain('nft');
@@ -255,22 +255,72 @@ describe('NFT prizes', () => {
     await a.db.prepare("UPDATE business_connections SET enabled = 0").run();
   });
 
-  it('NFT tiers are listed only while in stock and can actually drop from a case', async () => {
+  it('manual mode (default): withdraw → admin card → «Выдано» marks delivered and notifies the winner', async () => {
     const a = makeFlowApp();
+    await makeAdmin(a);
+    const u = await veteran(a);
+    const nftId = await addNft(a, 'nft_witchhat', 660, `manual:t:${Math.random()}`, '', 'Witch Hat');
+    await a.db.prepare("UPDATE nft_stock SET status = 'reserved' WHERE id = ?").bind(nftId).run();
+    const uid = await giveItem(a, u, 'nft_witchhat', nftId, 660);
+    const inv = (await req(a, 'GET', '/v1/inventory', u)).body.inventory;
+    expect(inv[0].nft).toEqual({ title: 'Witch Hat', name: '', link: 'https://fragment.com/gifts/witchhat', art: 'witchhat-7' });
+    expect((await req(a, 'POST', '/v1/withdraw', u, { uid })).body).toEqual({ status: 'queued', review: false, manual: true });
+    await a.settle();
+    expect(a.tg.of('transferGift')).toHaveLength(0);
+    const card = a.tg.of('sendMessage').find((m) => m.params.chat_id === Number(ADMIN) && /Выдай NFT вручную/.test(m.params.text))!;
+    expect(card.params.text).toContain('Witch Hat');
+    expect(card.params.text).toContain(`@u${u}`);
+    expect(card.params.text).toContain('660 ⭐');
+    const [btnOk, btnNo] = card.params.reply_markup.inline_keyboard[0];
+    expect(btnOk.text).toBe('✅ Выдано');
+    expect(btnNo.text).toContain('Отклонить');
+    expect(a.tg.of('sendMessage').some((m) => m.params.chat_id === Number(u) && /отправляется/.test(m.params.text))).toBe(true);
+    expect((await req(a, 'GET', '/v1/inventory', u)).body.inventory[0].status).toBe('withdrawing');
+    const res = await hook(a, { callback_query: { id: 'm1', from: { id: Number(ADMIN) }, data: btnOk.callback_data, message: { chat: { id: Number(ADMIN) }, message_id: 5, text: 'card' } } });
+    expect(res.body).toMatchObject({ callback: 'dd', ok: true });
+    expect(await status(a, 'nft_stock', 'id', nftId)).toBe('delivered');
+    expect(await status(a, 'inventory', 'uid', uid)).toBe('delivered');
+    expect(a.tg.of('sendMessage').some((m) => m.params.chat_id === Number(u) && /передан/.test(m.params.text))).toBe(true);
+    // a second tap does nothing
+    expect((await hook(a, { callback_query: { id: 'm2', from: { id: Number(ADMIN) }, data: btnOk.callback_data } })).body).toMatchObject({ ok: false });
+  });
+
+  it('manual mode: «Отклонить» refunds the NFT value in Stars and returns the unit to stock', async () => {
+    const a = makeFlowApp();
+    await makeAdmin(a);
+    const u = await veteran(a, 10);
+    const nftId = await addNft(a, 'nft_evileye', 900, `manual:t:${Math.random()}`, '', 'Evil Eye');
+    await a.db.prepare("UPDATE nft_stock SET status = 'reserved' WHERE id = ?").bind(nftId).run();
+    const uid = await giveItem(a, u, 'nft_evileye', nftId, 900);
+    await req(a, 'POST', '/v1/withdraw', u, { uid });
+    await a.settle();
+    const card = a.tg.of('sendMessage').find((m) => /Выдай NFT вручную/.test(m.params.text))!;
+    const no = card.params.reply_markup.inline_keyboard[0][1].callback_data;
+    expect((await hook(a, { callback_query: { id: 'x1', from: { id: Number(ADMIN) }, data: no } })).body).toMatchObject({ ok: true });
+    const bal = await a.db.prepare('SELECT balance FROM users WHERE id = ?').bind(u).first<{ balance: number }>();
+    expect(bal!.balance).toBe(910);
+    expect(await status(a, 'inventory', 'uid', uid)).toBe('refunded');
+    expect(await status(a, 'nft_stock', 'id', nftId)).toBe('in_stock');
+    expect(a.tg.of('sendMessage').some((m) => m.params.chat_id === Number(u) && /900/.test(m.params.text))).toBe(true);
+    await a.db.prepare("UPDATE nft_stock SET status = 'removed' WHERE id = ?").bind(nftId).run();
+  });
+
+  it('collections are listed only while in stock, can drop from a case, and the admin gets a heads-up', async () => {
+    const a = makeFlowApp();
+    await makeAdmin(a);
     await a.db.prepare("UPDATE nft_stock SET status = 'removed' WHERE status = 'in_stock'").run();
     const u0 = await veteran(a);
     let cases = (await req(a, 'GET', '/v1/cases', u0)).body.cases;
     const king = () => cases.find((c: any) => c.id === 'king');
     expect(king().drops.some((d: any) => d.prize.startsWith('nft'))).toBe(false);
-    for (let i = 0; i < 30; i++) await addNft(a, 'nft_xl', 30_000);
-    for (let i = 0; i < 30; i++) await addNft(a, 'nft_l', 9_000);
+    for (let i = 0; i < 30; i++) await addNft(a, 'nft_scaredcat', 26090, `manual:sc:${i}:${Math.random()}`, '', 'Scared Cat');
+    for (let i = 0; i < 30; i++) await addNft(a, 'nft_astral', 13660, `manual:as:${i}:${Math.random()}`, '', 'Astral Shard');
     cases = (await req(a, 'GET', '/v1/cases', u0)).body.cases;
-    expect(king().drops.filter((d: any) => d.prize.startsWith('nft')).map((d: any) => d.prize).sort()).toEqual(['nft_l', 'nft_xl']);
+    expect(king().drops.filter((d: any) => d.prize.startsWith('nft')).map((d: any) => d.prize).sort()).toEqual(['nft_astral', 'nft_scaredcat']);
 
-    // pick a server seed whose fair roll lands on an NFT drop (deterministic, provably-fair path untouched)
     const u = await veteran(a, 5000);
     const row = await a.db.prepare('SELECT client_seed, nonce FROM users WHERE id = ?').bind(u).first<{ client_seed: string; nonce: number }>();
-    const table = liveDrops(CASES.find((c) => c.id === 'king')!, { nftInStock: ['nft_l', 'nft_xl'] });
+    const table = liveDrops(CASES.find((c) => c.id === 'king')!, { nftInStock: ['nft_astral', 'nft_scaredcat'] });
     const total = table.reduce((s, d) => s + d.weight, 0);
     const isNft = (r: number) => { let x = r * total; for (const d of table) { x -= d.weight; if (x < 0) return d.prize.startsWith('nft'); } return false; };
     let seed = '';
@@ -280,11 +330,29 @@ describe('NFT prizes', () => {
     expect(r.status).toBe(200);
     const got = r.body;
     expect(got.prize.kind).toBe('nft');
-    expect(got.prize.nft.title).toBe('Plush Pepe #1');
+    expect(['Scared Cat', 'Astral Shard']).toContain(got.prize.nft.title);
+    expect(got.prize.nft.art).toMatch(/^(scaredcat|astralshard)-\d+$/);
     const reserved = await a.db.prepare("SELECT COUNT(*) AS n FROM nft_stock WHERE status = 'reserved' AND item_uid = ?").bind(got.itemUid).first<{ n: number }>();
     expect(reserved!.n).toBe(1);
+    await a.settle();
+    expect(a.tg.of('sendMessage').some((m) => m.params.chat_id === Number(ADMIN) && /Выпал NFT/.test(m.params.text))).toBe(true);
     await a.db.prepare("UPDATE nft_stock SET status = 'removed' WHERE status = 'in_stock'").run();
   }, 60_000);
+
+  it('/nft_stock sets hand-delivered stock per collection; /nft lists collections', async () => {
+    const a = makeFlowApp();
+    await makeAdmin(a);
+    const msg = (text: string) => ({ update_id: Math.floor(Math.random() * 1e9), message: { message_id: 1, from: { id: Number(ADMIN) }, chat: { id: Number(ADMIN), type: 'private' }, text } });
+    await hook(a, msg('/nft_stock nft_hexpot 3'));
+    const n = async () => (await a.db.prepare("SELECT COUNT(*) AS n FROM nft_stock WHERE tier = 'nft_hexpot' AND status = 'in_stock'").first<{ n: number }>())!.n;
+    expect(await n()).toBe(3);
+    await hook(a, msg('/nft_stock nft_hexpot 1'));
+    expect(await n()).toBe(1);
+    await hook(a, msg('/nft'));
+    expect(a.tg.of('sendMessage').at(-1)!.params.text).toContain('Hex Pot');
+    await hook(a, msg('/nft_stock nft_hexpot 0'));
+    expect(await n()).toBe(0);
+  });
 });
 
 describe('economy guards on the server', () => {

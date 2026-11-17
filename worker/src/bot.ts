@@ -1,4 +1,4 @@
-import { NFT_TIERS, nftTierFor } from './catalog.ts';
+import { NFT_COLLECTIONS, NFT_DROPS, nftCollection, nftCollectionByName } from './catalog.ts';
 import { safeEqualHex, sha256Hex } from './crypto.ts';
 import { adminIds, getSetting, isAdmin, ownerConnection, setSetting, type Ctx } from './ctx.ts';
 import { log } from './log.ts';
@@ -109,9 +109,10 @@ const ADMIN_HELP = `<b>Админ-команды</b>
 /queue — выводы на проверке
 /deliveries — проблемные доставки
 /stats — банк, звёзды бота, игроки
-/nft — склад NFT
+/nft — NFT-призы: коллекции, цены, склад
+/nft_stock &lt;nft_id|all&gt; &lt;кол-во&gt; — сколько штук коллекции разыгрывать (0 — убрать из кейсов)
 /nft_sync — NFT в вашем Business-аккаунте
-/nft_add &lt;owned_gift_id&gt; &lt;цена⭐&gt; — добавить NFT в кейсы
+/nft_add &lt;owned_gift_id&gt; — положить свой NFT в кейсы (цена по коллекции)
 /nft_rm &lt;id&gt; — убрать NFT со склада
 /luck &lt;user_id&gt; &lt;0-10&gt; — карта удачи игроку`;
 
@@ -167,35 +168,53 @@ async function adminCommand(ctx: Ctx, chatId: number, adminId: string, cmd: stri
       return { stats: true };
     }
     case '/nft': {
-      const rows = await db.prepare("SELECT id, title, name, value, tier, status FROM nft_stock WHERE status != 'removed' ORDER BY value DESC LIMIT 50").all<Any>();
-      const list = (rows.results ?? []).map((r) => `#${r.id} <a href="https://t.me/nft/${esc(r.name)}">${esc(r.title)}</a> · ${r.value}⭐ · ${r.tier} · ${r.status}`);
-      await send(ctx, chatId, list.length ? `💎 <b>Склад NFT</b>\n${list.join('\n')}` : 'Склад NFT пуст. /nft_sync — посмотреть NFT в Business-аккаунте.');
+      const rows = await db.prepare("SELECT tier, status, COUNT(*) AS n FROM nft_stock WHERE status != 'removed' GROUP BY tier, status").all<{ tier: string; status: string; n: number }>();
+      const cnt = (id: string, st: string) => (rows.results ?? []).find((r) => r.tier === id && r.status === st)?.n ?? 0;
+      const where = (id: string) => Object.entries(NFT_DROPS).filter(([, d]) => id in d).map(([c]) => c).join(', ');
+      const list = NFT_COLLECTIONS.map((n) => `${cnt(n.id, 'in_stock') ? '🟢' : '⚪️'} <b>${esc(n.title)}</b> · ${n.value}⭐ · склад ${cnt(n.id, 'in_stock')}${cnt(n.id, 'reserved') ? ` · выпало ${cnt(n.id, 'reserved')}` : ''}${cnt(n.id, 'delivered') ? ` · выдано ${cnt(n.id, 'delivered')}` : ''}\n   <code>${n.id}</code> → ${where(n.id)}`);
+      await send(ctx, chatId, `💎 <b>NFT-призы</b> (выдача: ${ctx.cfg.nftDelivery === 'manual' ? 'вручную' : 'авто'})\n\n${list.join('\n')}\n\nИзменить склад: /nft_stock nft_witchhat 2`);
       return { nft: list.length };
+    }
+    case '/nft_stock': {
+      const [which, nRaw] = args;
+      const n = Math.max(0, Math.min(20, Math.floor(Number(nRaw))));
+      const targets = which === 'all' ? NFT_COLLECTIONS : NFT_COLLECTIONS.filter((c) => c.id === which);
+      if (!targets.length || !Number.isFinite(n) || nRaw == null) { await send(ctx, chatId, 'Формат: /nft_stock &lt;nft_id|all&gt; &lt;0–20&gt;. Список id: /nft'); return { nftStock: 'bad' }; }
+      const out: string[] = [];
+      for (const col of targets) out.push(`${esc(col.title)}: ${await setManualStock(ctx, col.id, n)}`);
+      log('info', 'nft_stock_set', { which, n });
+      await send(ctx, chatId, `✅ Склад обновлён\n${out.join('\n')}`);
+      return { nftStock: 'ok' };
     }
     case '/nft_sync': {
       const conn = await ownerConnection(ctx);
       if (!conn) { await send(ctx, chatId, BUSINESS_HOWTO); return { nftSync: 'no_connection' }; }
       const gifts = await listUniqueGifts(ctx, conn.id);
       const stocked = new Set(((await db.prepare("SELECT owned_gift_id FROM nft_stock WHERE status != 'removed'").all<{ owned_gift_id: string }>()).results ?? []).map((r) => r.owned_gift_id));
-      const lines = gifts.map((g) => `${stocked.has(g.owned_gift_id) ? '✅' : '➕'} <a href="https://t.me/nft/${esc(g.name)}">${esc(g.title)}</a> · перевод ${g.transfer_star_count ?? 0}⭐${g.can_be_transferred === false ? ' · нельзя передать' : ''}\n<code>/nft_add ${g.owned_gift_id} ЦЕНА</code>`);
-      await send(ctx, chatId, lines.length ? `💎 NFT в Business-аккаунте (цена — в звёздах, диапазоны: S ${NFT_TIERS.nft_s.min}–${NFT_TIERS.nft_s.max}, M ${NFT_TIERS.nft_m.min}–${NFT_TIERS.nft_m.max}, L ${NFT_TIERS.nft_l.min}–${NFT_TIERS.nft_l.max})\n\n${lines.join('\n\n')}` : 'В Business-аккаунте нет передаваемых NFT.');
+      const lines = gifts.map((g) => {
+        const col = nftCollectionByName(g.name);
+        return `${stocked.has(g.owned_gift_id) ? '✅' : col ? '➕' : '·'} <a href="https://t.me/nft/${esc(g.name)}">${esc(g.title)}</a> · перевод ${g.transfer_star_count ?? 0}⭐${g.can_be_transferred === false ? ' · нельзя передать' : ''}${col ? `\n<code>/nft_add ${g.owned_gift_id}</code> (${col.value}⭐)` : ' · коллекции нет в кейсах'}`;
+      });
+      await send(ctx, chatId, lines.length ? `💎 NFT в Business-аккаунте\n\n${lines.join('\n\n')}` : 'В Business-аккаунте нет передаваемых NFT.');
       return { nftSync: gifts.length };
     }
     case '/nft_add': {
-      const [ownedId, valueRaw] = args;
-      const value = Number(valueRaw);
-      const tier = nftTierFor(value);
-      if (!ownedId || !tier) { await send(ctx, chatId, `Формат: /nft_add &lt;owned_gift_id&gt; &lt;цена⭐&gt;; цена ${NFT_TIERS.nft_s.min}–${NFT_TIERS.nft_l.max}`); return { nftAdd: 'bad' }; }
+      const [ownedId] = args;
+      if (!ownedId) { await send(ctx, chatId, 'Формат: /nft_add &lt;owned_gift_id&gt; (список: /nft_sync)'); return { nftAdd: 'bad' }; }
       const conn = await ownerConnection(ctx);
       if (!conn) { await send(ctx, chatId, BUSINESS_HOWTO); return { nftAdd: 'no_connection' }; }
       const g = (await listUniqueGifts(ctx, conn.id)).find((x) => x.owned_gift_id === ownedId);
       if (!g) { await send(ctx, chatId, 'NFT с таким owned_gift_id не найден в Business-аккаунте (/nft_sync).'); return { nftAdd: 'missing' }; }
       if (g.can_be_transferred === false) { await send(ctx, chatId, 'Этот NFT нельзя передать.'); return { nftAdd: 'locked' }; }
+      const col = nftCollectionByName(g.name);
+      if (!col) { await send(ctx, chatId, `Коллекции ${esc(g.title)} нет среди призов (/nft). Её цену и место в кейсах сначала нужно добавить в каталог.`); return { nftAdd: 'unknown_collection' }; }
+      const value = col.value;
+      const tier = col.id;
       await db.prepare(`INSERT INTO nft_stock (owned_gift_id, name, title, value, tier, transfer_cost, status, added_at) VALUES (?, ?, ?, ?, ?, ?, 'in_stock', ?)
         ON CONFLICT(owned_gift_id) DO UPDATE SET value = excluded.value, tier = excluded.tier, transfer_cost = excluded.transfer_cost, status = CASE WHEN nft_stock.status = 'removed' THEN 'in_stock' ELSE nft_stock.status END`)
         .bind(ownedId, g.name, g.title, value, tier, g.transfer_star_count ?? 0, Date.now()).run();
       log('info', 'nft_added', { ownedId, value, tier });
-      await send(ctx, chatId, `✅ ${esc(g.title)} добавлен: ${value}⭐, уровень ${tier}. Он появится в кейсах этого уровня.`);
+      await send(ctx, chatId, `✅ ${esc(g.title)} добавлен: ${value}⭐ (${esc(col.title)}). Он появится в кейсах: ${Object.entries(NFT_DROPS).filter(([, d]) => col.id in d).map(([c]) => c).join(', ')}.`);
       return { nftAdd: 'ok', tier };
     }
     case '/nft_rm': {
@@ -264,3 +283,34 @@ async function onCallback(ctx: Ctx, q: Any) {
 }
 
 export { adminIds };
+
+/** Manual stock = N "one gift of this collection" units (owned_gift_id manual:<prize>:<k>). Never touches won/delivered units. */
+export async function setManualStock(ctx: Ctx, prizeId: string, n: number) {
+  const col = nftCollection(prizeId);
+  if (!col) return 'нет такой коллекции';
+  const db = ctx.db;
+  const now = Date.now();
+  const have = (await db.prepare("SELECT id, owned_gift_id, status FROM nft_stock WHERE tier = ? AND owned_gift_id LIKE 'manual:%'").bind(prizeId).all<{ id: number; owned_gift_id: string; status: string }>()).results ?? [];
+  const inStock = have.filter((r) => r.status === 'in_stock');
+  const stmts: D1PreparedStatement[] = [];
+  if (inStock.length > n) {
+    for (const r of inStock.slice(n)) stmts.push(db.prepare("UPDATE nft_stock SET status = 'removed' WHERE id = ? AND status = 'in_stock'").bind(r.id));
+  } else {
+    let need = n - inStock.length;
+    for (const r of have.filter((x) => x.status === 'removed')) {
+      if (!need) break;
+      stmts.push(db.prepare("UPDATE nft_stock SET status = 'in_stock', value = ?, title = ? WHERE id = ? AND status = 'removed'").bind(col.value, col.title, r.id));
+      need--;
+    }
+    let k = have.length;
+    while (need-- > 0) {
+      k++;
+      stmts.push(db.prepare(`INSERT OR IGNORE INTO nft_stock (owned_gift_id, name, title, value, tier, transfer_cost, status, added_at) VALUES (?, '', ?, ?, ?, 0, 'in_stock', ?)`)
+        .bind(`manual:${prizeId}:${now.toString(36)}${k}`, col.title, col.value, prizeId, now));
+    }
+  }
+  stmts.push(db.prepare("UPDATE nft_stock SET value = ? WHERE tier = ? AND status = 'in_stock'").bind(col.value, prizeId));
+  await db.batch(stmts);
+  const left = await db.prepare("SELECT COUNT(*) AS n FROM nft_stock WHERE tier = ? AND status = 'in_stock'").bind(prizeId).first<{ n: number }>();
+  return `в кейсах ${left?.n ?? 0} шт.`;
+}
