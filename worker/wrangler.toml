@@ -11,8 +11,8 @@ enabled = true
 [[d1_databases]]
 binding = "DB"
 database_name = "ghost-gift"
-# Replace with the id printed by `npx wrangler d1 create ghost-gift`.
-database_id = "00000000-0000-0000-0000-000000000000"
+# Created with `npx wrangler d1 create ghost-gift`.
+database_id = "a50d5183-bb78-4f5a-b18a-6f9741513a56"
 migrations_dir = "migrations"
 
 [vars]
