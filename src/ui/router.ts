@@ -11,7 +11,7 @@ import { tg } from '../core/telegram';
  * and bottom sheets: the top-most handler wins (sheet → page → nothing).
  */
 export type Tab = 'games' | 'profile';
-export type PushId = 'cases' | 'case' | 'daily' | 'inventory' | 'wheel' | 'slots' | 'luck' | 'topup';
+export type PushId = 'cases' | 'case' | 'daily' | 'inventory' | 'wheel' | 'slots' | 'luck' | 'topup' | 'legal';
 
 export interface Page { el: HTMLElement; onShow?(): void; onHide?(): void; destroy?(): void; /** return false to veto back (e.g. mid-opening) */ onBack?(): boolean | void; /** @internal */ backFn?: () => void }
 type TabScreen = { el: HTMLElement; onShow?(): void; onHide?(): void };
@@ -58,6 +58,8 @@ const PAGES: Partial<Record<PushId, (p: Params) => Promise<Page>>> = {
   case: (p) => import('../screens/case').then((m) => m.createCase(p.id)),
   daily: () => import('../screens/case').then((m) => m.createCase('daily')),
   inventory: () => import('../screens/inventory').then((m) => m.createInventory()),
+  legal: (p) => import('../screens/legal').then((m) => m.createLegal(p.id as never)),
+  topup: () => import('../screens/topup').then((m) => m.createTopup()),
 };
 
 /** Warm lazy modules when the main thread is idle. */

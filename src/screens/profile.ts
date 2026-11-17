@@ -6,7 +6,7 @@ import { setSound } from '../core/sound';
 import { ji } from '../art/games';
 import { avatar, MASCOT_URL } from '../ui/header';
 import { navigate } from '../ui/router';
-import { PRIZES } from '../api/catalog';
+import { itemPrize } from '../art/cases';
 
 /** Profile tab: stats, inventory entry, withdrawal rules, sound, ghost collection. Lazy-loaded. */
 export function createProfile() {
@@ -31,7 +31,7 @@ export function createProfile() {
   invRow.addEventListener('click', () => navigate.push('inventory'));
   const renderInv = () => {
     const items = store.inventory.get();
-    const v = items.reduce((s, i) => s + PRIZES[i.prizeId].value, 0);
+    const v = items.reduce((s, i) => s + itemPrize(i).value, 0);
     invSub.innerHTML = `${t('profile.inventorySub', { n: items.length, v: fmt(v) })}${starIcon('star-ico star-inline')}`;
   };
   const rulesRow = h('button', { class: 'row', 'data-press': '' },
@@ -45,7 +45,26 @@ export function createProfile() {
     h('span', { class: 'row-t' }, h('span', { class: 'row-title' }, t('profile.sound'))), sw);
   const renderSnd = () => { sw.classList.toggle('is-on', store.sound.get()); sndRow.setAttribute('aria-checked', String(store.sound.get())); };
   sndRow.addEventListener('click', () => setSound(!store.sound.get()));
-  const menu = h('div', { class: 'menu glass' }, invRow, rulesRow, sndRow);
+  const link = (ico: string, title: Parameters<typeof t>[0], sub: Parameters<typeof t>[0] | null, go: () => void, cls = '') => {
+    const b = h('button', { class: `row ${cls}`, 'data-press': '' },
+      html(`<span class="row-ico">${ico}</span>`),
+      h('span', { class: 'row-t' }, h('span', { class: 'row-title' }, t(title)), sub ? h('span', { class: 'row-sub' }, t(sub)) : null),
+      html('<span class="row-chev">›</span>'));
+    b.addEventListener('click', go);
+    return b;
+  };
+  const topRow = link(starIcon('star-ico row-star'), 'profile.topup', null, () => navigate.push('topup'), 'row-topup');
+  const menu = h('div', { class: 'menu glass' }, topRow, invRow, rulesRow, sndRow);
+  const docs = h('div', { class: 'menu glass' },
+    link('<span class="row-glyph">✓</span>', 'profile.fair', 'profile.fairSub', () => navigate.push('legal', { id: 'fair' })),
+    link('<span class="row-glyph">§</span>', 'profile.docs', 'profile.docsSub', () => navigate.push('legal', { id: 'terms' })),
+    link('<span class="row-glyph">i</span>', 'profile.about', null, () => navigate.push('legal', { id: 'about' })));
+  const foot = h('footer', { class: 'pf-foot' },
+    h('div', { class: 'pf-brand' }, 'Ghost Gift'),
+    h('div', null, t('about.rights')),
+    h('div', null, t('about.version', { v: `${__APP_VERSION__} (${__APP_BUILD__})` })),
+    h('div', { class: 'pf-age' }, t('about.age')),
+    h('div', null, t('about.tg')));
 
   const ghosts = h('div', { class: 'ghost-row' });
   for (let i = 0; i < 5; i++) ghosts.append(html(`<span class="mini-ghost${i ? ' is-locked' : ''}"><img src="${MASCOT_URL}" alt="" loading="lazy" decoding="async" draggable="false"></span>`));
@@ -64,7 +83,7 @@ export function createProfile() {
   renderStats(); renderInv(); renderSnd();
   store.stats.sub(renderStats); store.inventory.sub(renderInv); store.sound.sub(renderSnd);
   const el = h('section', { class: 'screen screen-profile', 'data-screen': 'profile' },
-    h('div', { class: 'screen-scroll' }, head, stats, menu, collection));
+    h('div', { class: 'screen-scroll' }, head, stats, menu, collection, docs, foot));
   el.inert = true;
   return { el };
 }
