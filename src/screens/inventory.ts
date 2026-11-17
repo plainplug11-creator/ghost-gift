@@ -4,7 +4,7 @@ import '../styles/themes.css';
 import { h, html, starIcon } from '../core/dom';
 import { fmt, t } from '../core/i18n';
 import { store } from '../core/store';
-import { RARITY_RGB, isNft, isPremium, itemPrize, kindCls, prizeIcon, prizeName, rarityName } from '../art/cases';
+import { RARITY_RGB, isNft, isPremium, itemPrize, kindCls, reviewSet, prizeIcon, prizeName, rarityName } from '../art/cases';
 import { navBar } from '../ui/nav';
 import { balancePill } from '../ui/header';
 import { navigate, type Page } from '../ui/router';
@@ -24,13 +24,14 @@ export function createInventory(): Page {
 
   const render = () => {
     const items = store.inventory.get();
+    const review = reviewSet();
     const sum = items.reduce((s, i) => s + itemPrize(i).value, 0);
     total.innerHTML = `<span>${t('inv.value')}</span><b>${fmt(sum)}${starIcon('star-ico')}</b>`;
     empty.hidden = items.length > 0;
     grid.replaceChildren(...items.map((it, i) => {
       const p = itemPrize(it);
       const b = h('button', { class: `inv-it r-${p.rarity}${kindCls(p)}${it.status === 'withdrawing' ? ' is-pending' : ''}`, 'data-press': '', style: `--rc:${RARITY_RGB[p.rarity]};--i:${Math.min(i, 12)}` });
-      b.innerHTML = `<span class="inv-ico">${prizeIcon(p)}</span><span class="inv-n">${prizeName(p)}</span><span class="inv-r">${isNft(p) ? 'NFT' : isPremium(p) ? 'Premium' : rarityName(p)}</span><span class="inv-v">${fmt(p.value)}${starIcon('star-ico')}</span>${it.status === 'withdrawing' ? `<span class="inv-pending">${t('inv.pending')}</span>` : ''}`;
+      b.innerHTML = `<span class="inv-ico">${prizeIcon(p)}</span><span class="inv-n">${prizeName(p)}</span><span class="inv-r">${isNft(p) ? 'NFT' : isPremium(p) ? 'Premium' : rarityName(p)}</span><span class="inv-v">${fmt(p.value)}${starIcon('star-ico')}</span>${it.status === 'withdrawing' ? (review.has(it.uid) ? `<span class="inv-pending is-review">${t('inv.review')}</span>` : `<span class="inv-pending">${t('inv.pending')}</span>`) : ''}`;
       b.addEventListener('click', () => openItem(it));
       return b;
     }));

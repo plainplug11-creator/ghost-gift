@@ -5,22 +5,13 @@ import { fmt, t } from '../core/i18n';
 import { store } from '../core/store';
 import { tg } from '../core/telegram';
 import { api } from '../api';
-import * as catalog from '../api/catalog';
+import { TOPUP_PACKS } from '../api/catalog';
 import { apiErrorText } from '../api/errors';
 import { navBar } from '../ui/nav';
 import { balancePill } from '../ui/header';
 import { toast } from '../ui/sheet';
 import { navigate, type Page } from '../ui/router';
 
-/** Packs come from the shared config (TOPUP_PACKS) when the backend ships it; this is the same default list. */
-const PACKS_KEY = 'TOPUP_PACKS';
-const packs = (): readonly number[] => ((catalog as unknown as Record<string, readonly number[] | undefined>)[PACKS_KEY]) ?? [50, 100, 250, 500, 1000, 2500];
-
-/**
- * TODO(server hook): `api.topup(stars)` → { link, invoiceId } from POST /v1/topup (createInvoiceLink, XTR).
- * The screen opens the invoice with Telegram.WebApp.openInvoice and refreshes the balance on "paid".
- */
-type TopupApi = { topup?: (stars: number) => Promise<{ link: string; invoiceId?: string }> };
 
 export function createTopup(): Page {
   const bal = balancePill(false);
@@ -29,21 +20,17 @@ export function createTopup(): Page {
   let busy = false;
   const buy = async (n: number, card: HTMLElement) => {
     if (busy) return;
-    const fn = (api as unknown as TopupApi).topup;
-    if (!fn) { tg.haptic.warning(); toast(t('topup.soon'), 'info'); return; }
     busy = true; card.classList.add('is-busy');
     try {
-      const { link } = await fn.call(api, n);
-      const st = await tg.invoice(link);
-      if (st === 'paid') { tg.haptic.success(); toast(t('topup.done')); void api.bootstrap().catch(() => {}); }
-      else if (st === 'pending') toast(t('topup.pending'), 'info');
-      else if (st === 'cancelled') toast(t('topup.cancel'), 'info');
-      else if (st === 'unsupported') { tg.open(link); }
+      const r = await api.topUp(n);
+      if (r.status === 'paid') { tg.haptic.success(); toast(t('topup.done')); card.classList.add('is-paid'); setTimeout(() => card.classList.remove('is-paid'), 1600); }
+      else if (r.status === 'pending') toast(t('topup.pending'), 'info');
+      else if (r.status === 'cancelled') toast(t('topup.cancel'), 'info');
       else { tg.haptic.error(); toast(t('err.generic'), 'err'); }
     } catch (e) { tg.haptic.error(); toast(apiErrorText(e), 'err'); }
     finally { busy = false; card.classList.remove('is-busy'); }
   };
-  const list = packs();
+  const list: readonly number[] = TOPUP_PACKS;
   const grid = h('div', { class: 'tu-grid' });
   list.forEach((n, i) => {
     const lvl = Math.min(4, Math.floor((i / Math.max(1, list.length - 1)) * 4));

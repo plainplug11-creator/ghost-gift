@@ -9,7 +9,7 @@ import { api } from '../api';
 import { apiErrorText } from '../api/errors';
 import { PREMIUM_TIERS, PRIZES } from '../api/catalog';
 import type { InvItem, Prize } from '../api/types';
-import { RARITY_RGB, isNft, isPremium, itemPrize, kindCls, nftOf, prizeIcon, prizeName, rarityName } from '../art/cases';
+import { RARITY_RGB, isNft, isPremium, itemPrize, kindCls, markReview, nftOf, reviewSet, prizeIcon, prizeName, rarityName } from '../art/cases';
 import { MASCOT_URL } from '../ui/header';
 import { openSheet, toast } from '../ui/sheet';
 import prizesUrl from '../assets/prizes.webp';
@@ -133,10 +133,11 @@ export function openItem(it: InvItem) {
       html(`<span class="it-ico">${prizeIcon(p, 'big')}</span>`),
       h('div', { class: 'it-n' }, prizeName(p)),
       html(`<div class="rs-meta"><span class="rs-r">${isNft(p) ? t('nft.unique') : isPremium(p) ? t('prem.kind') : rarityName(p)}</span><span class="rs-v">${fmt(p.value)}${starIcon('star-ico')}</span></div>`),
-      pending ? h('span', { class: 'inv-pending' }, t('inv.pending')) : null),
+      pending ? h('span', { class: `inv-pending${reviewSet().has(it.uid) ? ' is-review' : ''}` }, reviewSet().has(it.uid) ? t('inv.review') : t('inv.pending')) : null,
+      pending && reviewSet().has(it.uid) ? h('p', { class: 'it-review' }, t('inv.reviewNote')) : null),
     h('div', { class: 'it-actions' },
       btn(isPremium(p) ? t('inv.withdrawPremium') : t('inv.withdraw'), 'btn-primary', async () => {
-        try { await api.withdraw(it.uid); tg.haptic.success(); toast(t('inv.queued')); s.close(); }
+        try { const r = await api.withdraw(it.uid); tg.haptic.success(); if (r.review) { markReview(it.uid); toast(t('inv.reviewToast'), 'info'); } else toast(t('inv.queued')); s.close(); }
         catch (e) { tg.haptic.error(); toast(apiErrorText(e), 'err'); }
       }, pending),
       btn(sellLabel, 'btn-ghost', async () => {

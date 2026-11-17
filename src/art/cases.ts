@@ -71,6 +71,11 @@ export const prizeIcon = (p: Prize, cls = '') => {
   return `<span class="pi pi-${p.icon} ${cls}" aria-hidden="true"></span>`;
 };
 
+/** Withdrawals that went to moderator review (server returns review:true; remembered locally for the badge). */
+const REVIEW_KEY = 'gg.review';
+export const reviewSet = (): Set<string> => { try { return new Set(JSON.parse(localStorage.getItem(REVIEW_KEY) || '[]')); } catch { return new Set(); } };
+export const markReview = (uid: string) => { const s = reviewSet(); s.add(uid); try { localStorage.setItem(REVIEW_KEY, JSON.stringify([...s].slice(-100))); } catch { /* private mode */ } };
+
 /** Display prize for an inventory item: catalog entry + server extras (concrete NFT, sell-back value). */
 export function itemPrize(it: InvItem): Prize {
   const x = it as InvItem & { value?: number; nft?: NftLike };

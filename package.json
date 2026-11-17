@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "license": "UNLICENSED",
-  "description": "Ghost Gift — Telegram Mini App. Proprietary software, © 2026 Ghost Gift. All rights reserved."
+  "description": "Ghost Gift — Telegram Mini App. Proprietary software, © 2026 Ghost Gift. All rights reserved.",
   "type": "module",
   "scripts": {
     "dev": "vite --host",

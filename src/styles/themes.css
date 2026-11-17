@@ -232,3 +232,9 @@ html:not([data-tier="low"]):not(.reduce-motion) .k-nft::after { animation: nft-f
 .bs.rs.k-nft .rs-r { color: #fff; background: linear-gradient(90deg, #46e6ff, #a65cff, #ff5ccc); border-color: transparent; }
 .bs.rs.k-prem .rs-r { color: #fff; background: linear-gradient(90deg, #7a5cff, #3f8cff); border-color: transparent; }
 .rs-nft { display: block; width: 100%; margin-top: 8px; color: #c9b6ff; font-weight: 700; }
+
+/* withdrawal under moderator review */
+.inv-pending.is-review { background: linear-gradient(135deg, rgba(185,92,255,.35), rgba(255,79,216,.3)); color: #fff; box-shadow: 0 0 12px rgba(185,92,255,.45); animation: rv-pulse 2.4s ease-in-out infinite; }
+@keyframes rv-pulse { 50% { box-shadow: 0 0 20px rgba(255,79,216,.55); } }
+.it-review { margin: 10px 4px 0; font-size: 12.5px; line-height: 1.45; color: rgba(255,255,255,.7); text-align: center; }
+@media (prefers-reduced-motion: reduce) { .inv-pending.is-review { animation: none; } }

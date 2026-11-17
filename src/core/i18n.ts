@@ -60,7 +60,7 @@ const ru = {
   'case.diamond': 'Алмазный',
   'case.legend': 'Легенда',
   'case.spark': 'Искра',
-  'case.lantern': 'Листопад',
+  'case.lantern': 'Фонарь',
   'case.aurora': 'Аврора',
   'case.phantom': 'Фантом',
   'case.king': 'Король призраков',
@@ -190,7 +190,7 @@ const ru = {
   'cases.top': 'Топ',
   'fl.daily': 'Подарок дня!',
   'fl.spark': 'Искра удачи!',
-  'fl.lantern': 'Листопад принёс!',
+  'fl.lantern': 'Фонарь засиял!',
   'fl.autumn': 'Осень щедра!',
   'fl.neon': 'Разряд удачи!',
   'fl.ghost': 'Призрак шепнул…',
@@ -214,6 +214,9 @@ const ru = {
   'tag.king': 'Самый роскошный кейс Ghost Gift',
   'egg.ghost': 'Бу! Ты нашёл секретного призрака 👻',
   'egg.king': 'Король призраков кланяется тебе 👑',
+  'inv.review': 'На проверке',
+  'inv.reviewToast': 'Заявка на проверке у модератора — обычно до 24 часов, бот напишет',
+  'inv.reviewNote': 'Крупные и NFT-выводы проверяет модератор. Если что-то не так, стоимость вернётся на баланс.',
 } as const;
 
 export type I18nKey = keyof typeof ru;
@@ -278,7 +281,7 @@ const en: Record<I18nKey, string> = {
   'case.diamond': 'Diamond',
   'case.legend': 'Legend',
   'case.spark': 'Spark',
-  'case.lantern': 'Leaf Fall',
+  'case.lantern': 'Lantern',
   'case.aurora': 'Aurora',
   'case.phantom': 'Phantom',
   'case.king': 'Ghost King',
@@ -432,6 +435,9 @@ const en: Record<I18nKey, string> = {
   'tag.king': 'The most lavish case in Ghost Gift',
   'egg.ghost': 'Boo! You found the secret ghost 👻',
   'egg.king': 'The Ghost King bows to you 👑',
+  'inv.review': 'Under review',
+  'inv.reviewToast': 'A moderator is checking the request — usually within 24 hours, the bot will message you',
+  'inv.reviewNote': 'Large and NFT withdrawals are checked by a moderator. If anything is wrong, the value returns to your balance.',
 };
 
 
@@ -495,7 +501,7 @@ const uk: Record<I18nKey, string> = {
   'case.diamond': 'Діамантовий',
   'case.legend': 'Легенда',
   'case.spark': 'Іскра',
-  'case.lantern': 'Листопад',
+  'case.lantern': 'Ліхтар',
   'case.aurora': 'Аврора',
   'case.phantom': 'Фантом',
   'case.king': 'Король привидів',
@@ -625,7 +631,7 @@ const uk: Record<I18nKey, string> = {
   'cases.top': 'Топ',
   'fl.daily': 'Подарунок дня!',
   'fl.spark': 'Іскра удачі!',
-  'fl.lantern': 'Листопад приніс!',
+  'fl.lantern': 'Ліхтар засяяв!',
   'fl.autumn': 'Осінь щедра!',
   'fl.neon': 'Розряд удачі!',
   'fl.ghost': 'Привид прошепотів…',
@@ -649,6 +655,9 @@ const uk: Record<I18nKey, string> = {
   'tag.king': 'Найрозкішніший кейс Ghost Gift',
   'egg.ghost': 'Бу! Ти знайшов секретного привида 👻',
   'egg.king': 'Король привидів вклоняється тобі 👑',
+  'inv.review': 'На перевірці',
+  'inv.reviewToast': 'Заявка на перевірці в модератора — зазвичай до 24 годин, бот напише',
+  'inv.reviewNote': 'Великі та NFT-виведення перевіряє модератор. Якщо щось не так, вартість повернеться на баланс.',
 };
 
 const dicts = { ru, en, uk } as const;
