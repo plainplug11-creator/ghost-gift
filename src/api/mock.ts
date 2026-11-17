@@ -98,7 +98,7 @@ export const mockApi: GameApi = {
   async sell(uid) {
     const i = S.inv.findIndex((x) => x.uid === uid && x.status === 'owned');
     if (i < 0) throw new ApiError('NOT_FOUND');
-    const value = PRIZES[S.inv[i].prizeId].value;
+    const value = S.inv[i].value ?? PRIZES[S.inv[i].prizeId].value;
     S.inv.splice(i, 1); S.balance += value; sync();
     return { balance: S.balance, credited: value };
   },
@@ -114,6 +114,12 @@ export const mockApi: GameApi = {
     if (S.balance < tier.price) throw new ApiError('NO_BALANCE');
     S.balance -= tier.price; sync();
     return { status: 'queued' as const, balance: S.balance };
+  },
+  async topUp(stars) {
+    // demo only: no real payment in mock mode
+    if (!Number.isInteger(stars) || stars < 1) throw new ApiError('NOT_FOUND');
+    S.balance += stars; sync();
+    return { status: 'paid' as const, balance: S.balance };
   },
   inventory: () => [...S.inv],
   cases: () => CASES,

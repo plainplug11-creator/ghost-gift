@@ -1,6 +1,6 @@
 import type { GameApi } from './index';
 import { ApiError } from './types';
-import type { Fairness, InvItem, OpenResult } from './types';
+import type { CaseDrop, Fairness, InvItem, OpenResult } from './types';
 import { CASES } from './catalog';
 import { store } from '../core/store';
 
@@ -60,7 +60,7 @@ async function req<T>(path: string, opts: { method?: string; body?: unknown; key
   if (!res.ok) {
     const code = data.error;
     if (res.status === 401 || code === 'UNAUTHORIZED' || code === 'STALE_AUTH') throw new ApiError('AUTH');
-    if (code === 'NO_BALANCE' || code === 'DAILY_COOLDOWN' || code === 'NOT_FOUND' || code === 'BUSY') throw new ApiError(code);
+    if (code === 'NO_BALANCE' || code === 'DAILY_COOLDOWN' || code === 'NOT_FOUND' || code === 'BUSY' || code === 'NFT_PENDING') throw new ApiError(code);
     throw new ApiError('BUSY');
   }
   return data;
@@ -76,6 +76,7 @@ export const httpApi: GameApi = {
     C.inv = r.inventory || [];
     C.dailyReadyAt = r.dailyReadyAt || 0;
     sync();
+    void syncCases();
     return { balance: C.balance };
   },
   async nextRoundHash() {
@@ -87,7 +88,7 @@ export const httpApi: GameApi = {
       C.balance = r.balance;
       if (r.dailyReadyAt) C.dailyReadyAt = r.dailyReadyAt;
       if (r.itemUid) {
-        C.inv = [{ uid: r.itemUid, prizeId: r.prize.id, caseId, wonAt: Date.now(), status: 'owned' }, ...C.inv];
+        C.inv = [{ uid: r.itemUid, prizeId: r.prize.id, caseId, wonAt: Date.now(), status: 'owned', ...(r.prize.nft ? { value: r.prize.value, nft: r.prize.nft } : {}) }, ...C.inv];
       }
     }
     // store is synced by commit() after the reveal animation
@@ -102,7 +103,7 @@ export const httpApi: GameApi = {
     return r;
   },
   async withdraw(uid) {
-    const r = await req<{ status: 'queued' }>('/v1/withdraw', { body: { uid }, key: newKey() });
+    const r = await req<{ status: 'queued'; review?: boolean }>('/v1/withdraw', { body: { uid }, key: newKey() });
     const it = C.inv.find((x) => x.uid === uid);
     if (it) it.status = 'withdrawing';
     sync();
@@ -114,6 +115,34 @@ export const httpApi: GameApi = {
     sync();
     return r;
   },
+  async topUp(stars) {
+    const inv = await req<{ invoiceId: string; link: string }>('/v1/topup', { body: { stars } });
+    const tg = (window as unknown as { Telegram?: { WebApp?: { openInvoice?: (url: string, cb: (s: string) => void) => void } } }).Telegram?.WebApp;
+    if (!tg?.openInvoice) { window.open(inv.link, '_blank'); return { status: 'pending' as const, balance: C.balance }; }
+    const closed = await new Promise<string>((resolve) => tg.openInvoice!(inv.link, resolve));
+    if (closed === 'cancelled') return { status: 'cancelled' as const, balance: C.balance };
+    if (closed === 'failed') return { status: 'failed' as const, balance: C.balance };
+    // 'paid' (or 'pending'): the webhook credits the balance; poll briefly
+    for (let i = 0; i < 12; i++) {
+      try {
+        const s = await req<{ status: string; balance: number }>(`/v1/invoice?id=${encodeURIComponent(inv.invoiceId)}`);
+        if (s.status === 'paid') { C.balance = s.balance; sync(); return { status: 'paid' as const, balance: C.balance }; }
+      } catch { /* retry */ }
+      await new Promise((r) => setTimeout(r, i < 4 ? 700 : 1500));
+    }
+    return { status: 'pending' as const, balance: C.balance };
+  },
   inventory: () => [...C.inv],
   cases: () => CASES,
 };
+
+/** Live odds from the server (NFT tiers appear only while in stock); updates CASES in place. */
+async function syncCases() {
+  try {
+    const r = await req<{ cases: { id: string; drops: CaseDrop[] }[] }>('/v1/cases');
+    for (const live of r.cases || []) {
+      const c = CASES.find((x) => x.id === live.id);
+      if (c && Array.isArray(live.drops) && live.drops.length) c.drops = live.drops;
+    }
+  } catch { /* keep bundled odds */ }
+}

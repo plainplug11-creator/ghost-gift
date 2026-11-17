@@ -146,6 +146,8 @@ const ru = {
   'err.generic': 'Что-то пошло не так, попробуйте ещё раз',
   'err.offline': 'Нет связи с сервером. Проверьте интернет — повторим автоматически',
   'err.auth': 'Откройте Ghost Gift через бота в Telegram',
+  'err.nftPending': 'Вывод NFT скоро откроется — подарок сохранён в инвентаре, его можно продать',
+  'err.cancelled': 'Оплата отменена',
 } as const;
 
 export type I18nKey = keyof typeof ru;
@@ -296,6 +298,8 @@ const en: Record<I18nKey, string> = {
   'err.generic': 'Something went wrong, try again',
   'err.offline': 'Can’t reach the server. Check your connection — we’ll retry automatically',
   'err.auth': 'Open Ghost Gift from the Telegram bot',
+  'err.nftPending': 'NFT withdrawals open soon — your gift is safe in the inventory and can be sold',
+  'err.cancelled': 'Payment cancelled',
 };
 
 
@@ -445,6 +449,8 @@ const uk: Record<I18nKey, string> = {
   'err.generic': 'Щось пішло не так, спробуйте ще раз',
   'err.offline': 'Немає зв’язку з сервером. Перевірте інтернет — повторимо автоматично',
   'err.auth': 'Відкрийте Ghost Gift через бота в Telegram',
+  'err.nftPending': 'Виведення NFT скоро відкриється — подарунок збережено в інвентарі, його можна продати',
+  'err.cancelled': 'Оплату скасовано',
 };
 
 const dicts = { ru, en, uk } as const;

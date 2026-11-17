@@ -24,8 +24,15 @@ export interface GameApi {
   /** Apply the last result to visible state (after the reveal animation). */
   commit(): void;
   sell(uid: string): Promise<{ balance: number; credited: number }>;
-  withdraw(uid: string): Promise<{ status: 'queued' }>;
+  /** review=true: a moderator checks it first (large / NFT / new account). Throws NFT_PENDING while NFT delivery is unavailable. */
+  withdraw(uid: string): Promise<{ status: 'queued'; review?: boolean }>;
   buyPremium(months: 3 | 6 | 12): Promise<{ status: 'queued'; balance: number }>;
+  /**
+   * Buy Ghost Stars with Telegram Stars (XTR invoice inside Telegram).
+   * Resolves after the invoice closes: 'paid' (balance already synced), 'pending' (paid, credit still on its way),
+   * 'cancelled' or 'failed'. Suggested pack sizes: TOPUP_PACKS in catalog.
+   */
+  topUp(stars: number): Promise<{ status: 'paid' | 'pending' | 'cancelled' | 'failed'; balance: number }>;
   inventory(): InvItem[];
   cases(): CaseDef[];
 }
