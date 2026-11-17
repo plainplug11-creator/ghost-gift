@@ -1,0 +1,31 @@
+# Ghost Gift anticheat API on Cloudflare Workers + D1 (free plan).
+# Secrets are NOT stored here: `npx wrangler secret put BOT_TOKEN` (and WEBHOOK_SECRET).
+name = "ghost-gift-api"
+main = "src/index.ts"
+compatibility_date = "2026-11-01"
+workers_dev = true
+
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ghost-gift"
+# Replace with the id printed by `npx wrangler d1 create ghost-gift`.
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[vars]
+ALLOWED_ORIGINS = "https://plainplug11-creator.github.io"
+AUTH_MAX_AGE_SEC = "86400"
+BANK_START = "10000"
+BANK_RESERVE = "3000"
+DAILY_BIG_PRIZE_CAP = "8"
+BIG_PRIZE_MIN_VALUE = "250"
+WITHDRAW_REVIEW_MIN = "250"
+NEW_ACCOUNT_HOURS = "48"
+REVIEW_RISK_SCORE = "60"
+RATE_LIMIT_PER_MIN = "40"
+OPEN_LIMIT_PER_MIN = "20"
+AUTOCLICK_MIN_MS = "450"
+AUTOCLICK_REGULAR_STDDEV_MS = "25"
