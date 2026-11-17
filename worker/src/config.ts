@@ -15,6 +15,9 @@ export interface Env {
   OPEN_LIMIT_PER_MIN?: string;
   AUTOCLICK_MIN_MS?: string;
   AUTOCLICK_REGULAR_STDDEV_MS?: string;
+  ADMIN_IDS?: string;
+  ADMIN_CLAIM_CODE?: string;
+  WEBAPP_URL?: string;
 }
 
 export interface Config {
@@ -33,6 +36,9 @@ export interface Config {
   openLimitPerMin: number;
   autoclickMinMs: number;
   autoclickRegularStddevMs: number;
+  adminIds: string[];
+  adminClaimCode: string;
+  webAppUrl: string;
 }
 
 export function loadConfig(env: Partial<Env>, overrides: Partial<Config> = {}): Config {
@@ -44,15 +50,18 @@ export function loadConfig(env: Partial<Env>, overrides: Partial<Config> = {}): 
     authMaxAgeSec: num(env.AUTH_MAX_AGE_SEC, 86400),
     bankStart: num(env.BANK_START, 10000),
     bankReserve: num(env.BANK_RESERVE, 3000),
-    dailyBigPrizeCap: num(env.DAILY_BIG_PRIZE_CAP, 8),
+    dailyBigPrizeCap: num(env.DAILY_BIG_PRIZE_CAP, 20),
     bigPrizeMinValue: num(env.BIG_PRIZE_MIN_VALUE, 250),
-    withdrawReviewMin: num(env.WITHDRAW_REVIEW_MIN, 250),
+    withdrawReviewMin: num(env.WITHDRAW_REVIEW_MIN, 1500),
     newAccountHours: num(env.NEW_ACCOUNT_HOURS, 48),
     reviewRiskScore: num(env.REVIEW_RISK_SCORE, 60),
     rateLimitPerMin: num(env.RATE_LIMIT_PER_MIN, 40),
     openLimitPerMin: num(env.OPEN_LIMIT_PER_MIN, 20),
     autoclickMinMs: num(env.AUTOCLICK_MIN_MS, 450),
     autoclickRegularStddevMs: num(env.AUTOCLICK_REGULAR_STDDEV_MS, 25),
+    adminIds: (env.ADMIN_IDS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
+    adminClaimCode: env.ADMIN_CLAIM_CODE || '',
+    webAppUrl: env.WEBAPP_URL || 'https://plainplug11-creator.github.io/ghost-gift/',
     ...overrides,
   };
 }
