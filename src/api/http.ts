@@ -16,7 +16,7 @@ const C: Cache = { balance: 0, inv: [], dailyReadyAt: 0 };
 const sync = () => {
   store.balance.set(C.balance);
   store.inventory.set([...C.inv]);
-  if (C.dailyReadyAt) store.dailyReadyAt.set(C.dailyReadyAt);
+  store.dailyReadyAt.set(C.dailyReadyAt); // server is the source of truth (0 = ready)
 };
 
 const initData = () => {
@@ -40,21 +40,33 @@ async function req<T>(path: string, opts: { method?: string; body?: unknown; key
   };
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
   if (opts.key) headers['X-Idempotency-Key'] = opts.key;
-  const res = await fetch(`${BASE}${path}`, {
-    method: opts.method || (opts.body !== undefined ? 'POST' : 'GET'),
-    headers,
-    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-  });
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      method: opts.method || (opts.body !== undefined ? 'POST' : 'GET'),
+      headers,
+      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      signal: ctrl.signal,
+    });
+  } catch {
+    throw new ApiError('OFFLINE'); // network down, DNS, CORS or timeout
+  } finally {
+    clearTimeout(timer);
+  }
   let data: { error?: string } & T;
-  try { data = await res.json(); } catch { throw new ApiError('BUSY'); }
+  try { data = await res.json(); } catch { throw new ApiError(res.status >= 500 || res.status === 0 ? 'OFFLINE' : 'BUSY'); }
   if (!res.ok) {
     const code = data.error;
+    if (res.status === 401 || code === 'UNAUTHORIZED' || code === 'STALE_AUTH') throw new ApiError('AUTH');
     if (code === 'NO_BALANCE' || code === 'DAILY_COOLDOWN' || code === 'NOT_FOUND' || code === 'BUSY') throw new ApiError(code);
     throw new ApiError('BUSY');
   }
   return data;
 }
 
+const TIMEOUT_MS = 12_000;
 const newKey = () => crypto.randomUUID();
 
 export const httpApi: GameApi = {

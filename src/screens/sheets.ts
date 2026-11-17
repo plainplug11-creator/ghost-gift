@@ -4,7 +4,8 @@ import { h, html, starIcon } from '../core/dom';
 import { fmt, t } from '../core/i18n';
 import { store } from '../core/store';
 import { tg } from '../core/telegram';
-import { api, ApiError } from '../api';
+import { api } from '../api';
+import { apiErrorText } from '../api/errors';
 import { PREMIUM_TIERS, PRIZES } from '../api/catalog';
 import type { InvItem, Prize } from '../api/types';
 import { RARITY_RGB, prizeIcon, prizeName, rarityName } from '../art/cases';
@@ -94,7 +95,7 @@ export function openPremium() {
       btn.disabled = !ok;
       btn.addEventListener('click', async () => {
         try { await api.buyPremium(tier.months); tg.haptic.success(); toast(t('prem.done')); s.close(); }
-        catch (e) { tg.haptic.error(); toast(e instanceof ApiError && e.code === 'NO_BALANCE' ? t('case.noBalance') : t('err.generic'), 'err'); }
+        catch (e) { tg.haptic.error(); toast(apiErrorText(e), 'err'); }
       });
       return h('div', { class: `pm-row glass m${tier.months}` },
         html(`<span class="pm-ico">${prizeIcon(PRIZES.prem3)}</span>`),
@@ -133,10 +134,12 @@ export function openItem(it: InvItem) {
       pending ? h('span', { class: 'inv-pending' }, t('inv.pending')) : null),
     h('div', { class: 'it-actions' },
       btn(p.kind === 'premium' ? t('inv.withdrawPremium') : t('inv.withdraw'), 'btn-primary', async () => {
-        await api.withdraw(it.uid); tg.haptic.success(); toast(t('inv.queued')); s.close();
+        try { await api.withdraw(it.uid); tg.haptic.success(); toast(t('inv.queued')); s.close(); }
+        catch (e) { tg.haptic.error(); toast(apiErrorText(e), 'err'); }
       }, pending),
       btn(sellLabel, 'btn-ghost', async () => {
-        const r = await api.sell(it.uid); tg.haptic.success(); toast(t('result.sold', { n: fmt(r.credited) })); s.close();
+        try { const r = await api.sell(it.uid); tg.haptic.success(); toast(t('result.sold', { n: fmt(r.credited) })); s.close(); }
+        catch (e) { tg.haptic.error(); toast(apiErrorText(e), 'err'); }
       }, pending),
       btn(t('inv.premium'), 'btn-ghost', () => { s.close().then(openPremium); }),
       btn(t('inv.keep'), 'btn-text', () => s.close()),

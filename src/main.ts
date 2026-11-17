@@ -14,7 +14,9 @@ import { createTabbar } from './ui/tabbar';
 import { initPress } from './ui/press';
 import { initRouter, navigate, prefetch, registerLazyTab, registerTab } from './ui/router';
 import { createHome } from './screens/home';
-import { api } from './api';
+import { api, ApiError } from './api';
+import { apiErrorText } from './api/errors';
+import { toast } from './ui/sheet';
 import { initSound } from './core/sound';
 
 // 1. Telegram + perf flags first (affect first paint styling)
@@ -33,7 +35,7 @@ const home = createHome();
 registerTab('games', home);
 registerLazyTab('profile', () => import('./screens/profile').then((m) => m.createProfile()));
 home.mount();
-void api.bootstrap();
+bootstrap();
 void initSound();
 
 // 3. Non-critical: ambient background + prefetch of lazy screens after first paint
@@ -53,3 +55,22 @@ const p = qs.get('push');
 if (p) setTimeout(async () => {
   for (const step of p.split(',')) { const [id, arg] = step.split(':'); await navigate.push(id as never, arg ? { id: arg } : {}); }
 }, 100);
+
+/** Load balance/inventory; on failure show a clear toast and retry with backoff (UI stays usable). */
+function bootstrap() {
+  let tries = 0;
+  let timer = 0;
+  let shown = '';
+  const run = () => {
+    clearTimeout(timer);
+    api.bootstrap().then(() => { tries = 0; shown = ''; }).catch((e: unknown) => {
+      const msg = apiErrorText(e);
+      if (msg !== shown) { toast(msg, 'err'); shown = msg; }
+      if (e instanceof ApiError && e.code === 'AUTH') return; // opened outside Telegram: retrying won't help
+      tries++;
+      timer = window.setTimeout(run, Math.min(30_000, 2_000 * 2 ** Math.min(tries, 4)));
+    });
+  };
+  run();
+  window.addEventListener('online', () => { if (shown) run(); });
+}

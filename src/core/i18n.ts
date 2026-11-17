@@ -139,6 +139,8 @@ const ru = {
   'share.text': 'Мне выпал «{item}» в Ghost Gift 👻',
   'share.soon': 'Истории заработают после запуска сервера',
   'err.generic': 'Что-то пошло не так, попробуйте ещё раз',
+  'err.offline': 'Нет связи с сервером. Проверьте интернет — повторим автоматически',
+  'err.auth': 'Откройте Ghost Gift через бота в Telegram',
 } as const;
 
 export type I18nKey = keyof typeof ru;
@@ -282,6 +284,8 @@ const en: Record<I18nKey, string> = {
   'share.text': 'I got “{item}” in Ghost Gift 👻',
   'share.soon': 'Stories will work once the server is live',
   'err.generic': 'Something went wrong, try again',
+  'err.offline': 'Can’t reach the server. Check your connection — we’ll retry automatically',
+  'err.auth': 'Open Ghost Gift from the Telegram bot',
 };
 
 
@@ -424,6 +428,8 @@ const uk: Record<I18nKey, string> = {
   'share.text': 'Мені випав «{item}» у Ghost Gift 👻',
   'share.soon': 'Історії запрацюють після запуску сервера',
   'err.generic': 'Щось пішло не так, спробуйте ще раз',
+  'err.offline': 'Немає зв’язку з сервером. Перевірте інтернет — повторимо автоматично',
+  'err.auth': 'Відкрийте Ghost Gift через бота в Telegram',
 };
 
 const dicts = { ru, en, uk } as const;

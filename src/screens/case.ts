@@ -5,7 +5,8 @@ import { fmt, t } from '../core/i18n';
 import { store } from '../core/store';
 import { tg } from '../core/telegram';
 import { setSound } from '../core/sound';
-import { api, ApiError } from '../api';
+import { api } from '../api';
+import { apiErrorText } from '../api/errors';
 import { caseById, caseStats } from '../api/catalog';
 import { RARITY_RANK, type OpenResult } from '../api/types';
 import { RARITY_RGB, caseImg, caseName, prizeIcon, prizeName, rarityName } from '../art/cases';
@@ -76,7 +77,7 @@ export function createCase(id: string): Page {
   // ── RTP + fairness ──
   const hashEl = h('code', { class: 'cd-hash' }, '…');
   const nonceEl = h('span', null, '');
-  const refreshHash = () => api.nextRoundHash().then((f) => { hashEl.textContent = `${f.serverSeedHash.slice(0, 10)}…${f.serverSeedHash.slice(-6)}`; nonceEl.textContent = t('case.fairHash', { n: f.nonce }); });
+  const refreshHash = () => api.nextRoundHash().then((f) => { hashEl.textContent = `${f.serverSeedHash.slice(0, 10)}…${f.serverSeedHash.slice(-6)}`; nonceEl.textContent = t('case.fairHash', { n: f.nonce }); }).catch(() => { /* keep placeholder; open() reports errors */ });
   refreshHash();
   const info = h('div', { class: 'cd-info glass' },
     isDaily ? null : h('div', { class: 'cd-rtp' },
@@ -118,7 +119,7 @@ export function createCase(id: string): Page {
     } catch (e) {
       el.classList.remove('is-busy');
       tg.haptic.error();
-      toast(e instanceof ApiError && e.code === 'NO_BALANCE' ? t('case.noBalance') : t('err.generic'), 'err');
+      toast(apiErrorText(e), 'err');
       return;
     }
     // optimistic display: spend now, credit after the reveal
@@ -169,7 +170,8 @@ export function createCase(id: string): Page {
     } else {
       act(t('result.toInv'), 'btn-primary', () => toast(t('result.saved')));
       act(priceLabel(t('result.sell'), p.value), 'btn-ghost', async () => {
-        const r = await api.sell(res.itemUid!); tg.haptic.success(); toast(t('result.sold', { n: fmt(r.credited) }));
+        try { const r = await api.sell(res.itemUid!); tg.haptic.success(); toast(t('result.sold', { n: fmt(r.credited) })); }
+        catch (e) { tg.haptic.error(); toast(apiErrorText(e), 'err'); }
       });
       if (!isDaily) act(priceLabel(t('result.again'), c.price), 'btn-ghost', () => open(false));
     }

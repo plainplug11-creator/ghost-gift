@@ -20,7 +20,8 @@ function signal<T>(initial: T) {
 const qs = new URLSearchParams(location.search);
 
 export const store = {
-  balance: signal(1250),
+  // server mode: show 0 until /v1/bootstrap returns the real balance (mock keeps its demo 1250)
+  balance: signal(import.meta.env.VITE_API_URL ? 0 : 1250),
   /** Timestamp when the next free daily case becomes available. */
   dailyReadyAt: signal(
     qs.has('daily') ? Date.now() + Number(qs.get('daily')) * 1000 : Number(localStorage.getItem('gg.dailyAt') || 0),

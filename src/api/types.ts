@@ -57,5 +57,5 @@ export interface InvItem { uid: string; prizeId: string; caseId: string; wonAt: 
 export interface PremiumTier { months: 3 | 6 | 12; price: number; base: number }
 
 export class ApiError extends Error {
-  constructor(public code: 'NO_BALANCE' | 'DAILY_COOLDOWN' | 'NOT_FOUND' | 'BUSY', msg = code) { super(msg); }
+  constructor(public code: 'NO_BALANCE' | 'DAILY_COOLDOWN' | 'NOT_FOUND' | 'BUSY' | 'OFFLINE' | 'AUTH', msg = code) { super(msg); }
 }
