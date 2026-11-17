@@ -411,7 +411,7 @@ const en: Record<I18nKey, string> = {
   'cases.top': 'Top',
   'fl.daily': 'Gift of the day!',
   'fl.spark': 'A spark of luck!',
-  'fl.lantern': 'The leaves brought it!',
+  'fl.lantern': 'Lantern glow!',
   'fl.autumn': 'Autumn is generous!',
   'fl.neon': 'Lucky charge!',
   'fl.ghost': 'The ghost whispered…',
