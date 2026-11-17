@@ -31,8 +31,8 @@ src/styles/             tokens (palette, springs), base, components, games, scre
 | What | Replace this file | Notes |
 |---|---|---|
 | Currency icon | `src/assets/currency.webp` | square, transparent, ≥384 px; used everywhere (header, feed, wheel hub, slots, top-up) |
-| Background video | `public/media/bg-loop.webm` + `public/media/bg-loop.mp4` | seamless loop, muted; WebM/VP9 first, MP4/H.264 for iOS |
-| Background still | `public/media/bg-poster.webp` | first paint + low-tier / reduced-motion / Data-Saver fallback |
+| Background video | `public/media/bg-{720,540}.{hevc.mp4,webm,mp4}` | seamless 7.5 s loop, muted; HEVC on Apple → VP9 → H.264; 720p on high tier, 540p on mid. Rebuild with `/workspace/ghost-gift-media/bg/{make-loop.py,encode.sh}` |
+| Background still | `public/media/bg-poster{,-540}.webp` (= first loop frame) | first paint + low-tier / reduced-motion / Data-Saver fallback |
 | Game hero art | `src/assets/{chest,gift,wheel,slots}-{240,480}.webp` | jelly cut-outs, srcset 1x/2x |
 | Jelly UI icons | `src/assets/icons.webp` + `src/styles/icons.css` | 6×3 atlas, 128px cells; regenerate with `/workspace/ghost-gift-media/jelly/export.py` |
 

@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://telegram.org" />
     <!-- Official Telegram Mini Apps SDK (must load before the app) -->
     <script src="https://telegram.org/js/telegram-web-app.js?59"></script>
-    <link rel="preload" as="image" href="%BASE_URL%media/bg-poster.webp" fetchpriority="high" />
+    <link rel="preload" as="image" href="%BASE_URL%media/bg-poster.webp" imagesrcset="%BASE_URL%media/bg-poster-540.webp 540w, %BASE_URL%media/bg-poster.webp 720w" imagesizes="100vw" fetchpriority="high" />
     <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
   </head>
   <body>
@@ -21,7 +21,7 @@
               <linearGradient id="jg-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#e6e0ff"/><stop offset="1" stop-color="#b9adff"/></linearGradient>
     </defs></svg>
     <div class="bg" id="bg" aria-hidden="true">
-      <img class="bg-media bg-poster" src="%BASE_URL%media/bg-poster.webp" alt="" fetchpriority="high" decoding="async" onload="this.classList.add('is-ready')" />
+      <img class="bg-media bg-poster" src="%BASE_URL%media/bg-poster.webp" srcset="%BASE_URL%media/bg-poster-540.webp 540w, %BASE_URL%media/bg-poster.webp 720w" sizes="100vw" alt="" fetchpriority="high" decoding="async" onload="this.classList.add('is-ready')" />
       <div class="bg-scrim"></div>
     </div>
     <canvas id="ambience" aria-hidden="true"></canvas>
