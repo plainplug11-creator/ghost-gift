@@ -12,7 +12,7 @@ enabled = true
 binding = "DB"
 database_name = "ghost-gift"
 # Created with `npx wrangler d1 create ghost-gift`.
-database_id = "a50d5183-bb78-4f5a-b18a-6f9741513a56"
+database_id = "6de1ef55-f52c-447a-a315-336bef59734c"
 migrations_dir = "migrations"
 
 [vars]
