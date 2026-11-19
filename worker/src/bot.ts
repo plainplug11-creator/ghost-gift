@@ -5,6 +5,9 @@ import { log } from './log.ts';
 import { applyRefund, checkPreCheckout, creditPayment } from './payments.ts';
 import { hitRateLimit } from './risk.ts';
 import { esc, itemName, tx as text } from './texts.ts';
+import { attachReferral } from './features.ts';
+import { levelInfo, parseRef, refLink } from './games-rules.ts';
+import { getOrCreateUser } from './users.ts';
 import { approveWithdrawal, markDeliveredManually, notifyAdminReview, rejectByDelivery, rejectWithdrawal, retryDelivery } from './withdrawals.ts';
 
 type Any = Record<string, any>;
@@ -73,8 +76,21 @@ async function onText(ctx: Ctx, msg: Any) {
     .bind(from.language_code ?? null, from.username ?? null, from.first_name ?? null, fromId).run();
   const playKb = { inline_keyboard: [[{ text: `👻 ${text(from.language_code, 'play')}`, web_app: { url: ctx.cfg.webAppUrl } }]] };
 
-  if (cmd === '/start') { await send(ctx, msg.chat.id, text(from.language_code, 'welcome'), { reply_markup: playKb }); return { start: true }; }
-  if (cmd === '/help') { await send(ctx, msg.chat.id, text(from.language_code, 'help'), { reply_markup: playKb }); return { help: true }; }
+  const L = from.language_code;
+  const wa = (q = '') => ({ url: ctx.cfg.webAppUrl + q });
+  const menuKb = { inline_keyboard: [
+    [{ text: `👻 ${text(L, 'play')}`, web_app: wa() }],
+    [{ text: text(L, 'btn_daily'), web_app: wa('?push=daily') }, { text: text(L, 'btn_wheel'), web_app: wa('?push=wheel') }],
+    [{ text: text(L, 'btn_invite'), callback_data: 'u:ref' }, { text: text(L, 'btn_help'), callback_data: 'u:help' }],
+  ] };
+  if (cmd === '/start') {
+    await startUser(ctx, fromId, args[0] ?? '');
+    await sendWelcome(ctx, msg.chat.id, L, menuKb);
+    return { start: true };
+  }
+  if (cmd === '/help') { await send(ctx, msg.chat.id, text(L, 'help'), { reply_markup: playKb }); return { help: true }; }
+  if (cmd === '/ref' || cmd === '/invite') { await sendRef(ctx, msg.chat.id, fromId, L); return { ref: true }; }
+  if (cmd === '/me' || cmd === '/profile') { await sendMe(ctx, msg.chat.id, fromId, L, playKb); return { me: true }; }
   if (cmd === '/admin' && !(await isAdmin(ctx, fromId))) return claimAdmin(ctx, msg.chat.id, from, args[0] ?? '');
   if (cmd.startsWith('/') && (await isAdmin(ctx, fromId))) return adminCommand(ctx, msg.chat.id, fromId, cmd, args);
   if (cmd.startsWith('/')) { await send(ctx, msg.chat.id, text(from.language_code, 'help'), { reply_markup: playKb }); return { unknown: true }; }
@@ -225,7 +241,7 @@ async function adminCommand(ctx: Ctx, chatId: number, adminId: string, cmd: stri
     case '/luck': {
       const [userId, pctRaw] = args;
       const pct = Math.max(0, Math.min(10, Math.round(Number(pctRaw) || 0)));
-      const r = await db.prepare('UPDATE users SET luck_pct = ? WHERE id = ? RETURNING id').bind(pct, String(userId)).first();
+      const r = await db.prepare('UPDATE users SET luck_pct = ?, luck_until = ? WHERE id = ? RETURNING id').bind(pct, pct ? 4102444800000 : 0, String(userId)).first();
       await send(ctx, chatId, r ? `🍀 Карта удачи ${pct}% выдана ${esc(String(userId))} (действует на кейсы до 50⭐).` : 'Игрок не найден.');
       return { luck: !!r };
     }
@@ -259,8 +275,17 @@ async function listUniqueGifts(ctx: Ctx, connId: string) {
 async function onCallback(ctx: Ctx, q: Any) {
   const fromId = String(q.from?.id ?? '');
   const answer = (t: string) => ctx.tg.call('answerCallbackQuery', { callback_query_id: q.id, text: t }).catch(() => {});
+  const data = String(q.data ?? '');
+  if (data.startsWith('u:')) {
+    const L = q.from?.language_code;
+    const chat = q.message?.chat?.id ?? q.from?.id;
+    await answer('');
+    if (data === 'u:ref') await sendRef(ctx, chat, fromId, L);
+    else if (data === 'u:help') await send(ctx, chat, text(L, 'help'), { reply_markup: { inline_keyboard: [[{ text: `👻 ${text(L, 'play')}`, web_app: { url: ctx.cfg.webAppUrl } }]] } });
+    return { callback: data };
+  }
   if (!(await isAdmin(ctx, fromId))) { await answer('Нет доступа'); return { callback: 'denied' }; }
-  const [act, id] = String(q.data ?? '').split(':');
+  const [act, id] = data.split(':');
   let res: { ok: boolean; msg: string };
   switch (act) {
     case 'wa': res = await approveWithdrawal(ctx, id, fromId); break;
@@ -283,6 +308,64 @@ async function onCallback(ctx: Ctx, q: Any) {
 }
 
 export { adminIds };
+
+/** /start: create the player on first contact, remember the deep-link referrer, mark the chat as open for notifications. */
+async function startUser(ctx: Ctx, userId: string, payload: string) {
+  const exists = await ctx.db.prepare('SELECT id FROM users WHERE id = ?').bind(userId).first();
+  if (!exists) await getOrCreateUser(ctx.db, userId);
+  await ctx.db.prepare('UPDATE users SET bot_started = 1 WHERE id = ?').bind(userId).run();
+  const ref = parseRef(payload);
+  if (ref) await attachReferral(ctx.db, userId, ref);
+}
+
+const BANNER = 'share/banner.jpg';
+async function sendWelcome(ctx: Ctx, chatId: number, lang: string | undefined, kb: Any) {
+  try {
+    await ctx.tg.call('sendPhoto', { chat_id: chatId, photo: ctx.cfg.webAppUrl.replace(/\/?$/, '/') + BANNER, caption: text(lang, 'welcome'), parse_mode: 'HTML', reply_markup: kb });
+  } catch {
+    await send(ctx, chatId, text(lang, 'welcome'), { reply_markup: kb });
+  }
+}
+
+async function sendRef(ctx: Ctx, chatId: number, userId: string, lang: string | undefined) {
+  await getOrCreateUser(ctx.db, userId);
+  const [u, f] = await Promise.all([
+    ctx.db.prepare('SELECT ref_earned FROM users WHERE id = ?').bind(userId).first<{ ref_earned: number }>(),
+    ctx.db.prepare('SELECT COUNT(*) AS n FROM users WHERE referred_by = ?').bind(userId).first<{ n: number }>(),
+  ]);
+  const link = refLink(userId);
+  const share = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text(lang, 'invite_text'))}`;
+  await send(ctx, chatId, text(lang, 'ref_info', { link, f: f?.n ?? 0, e: u?.ref_earned ?? 0 }), { reply_markup: { inline_keyboard: [[{ text: text(lang, 'btn_share'), url: share }]] } });
+}
+
+async function sendMe(ctx: Ctx, chatId: number, userId: string, lang: string | undefined, kb: Any) {
+  const u = await getOrCreateUser(ctx.db, userId) as Any;
+  const lv = levelInfo(u.xp ?? 0);
+  await send(ctx, chatId, text(lang, 'me', { name: esc(u.tg_first_name || 'Ghost'), b: u.balance, lvl: lv.level, xp: u.xp ?? 0, s: u.streak_count ?? 0, o: u.stats_opens }), { reply_markup: kb });
+}
+
+/** Opt-in evening reminder (18:00–21:59 Kyiv) for players whose streak would break tonight. Max 1/day per player. */
+export async function streakReminders(ctx: Ctx, now = Date.now(), limit = 25) {
+  const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Kyiv', hour: '2-digit', hourCycle: 'h23' }).format(now));
+  if (hour < 18 || hour > 21) return 0;
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Kyiv', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+  const yesterday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Kyiv', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now - 86400_000);
+  const rows = (await ctx.db.prepare(`SELECT id, lang, streak_count FROM users WHERE notify = 1 AND bot_started = 1 AND streak_day = ? AND streak_count >= 2
+    AND (notified_day IS NULL OR notified_day != ?) LIMIT ?`).bind(yesterday, today, limit).all<{ id: string; lang: string | null; streak_count: number }>()).results ?? [];
+  let sent = 0;
+  for (const r of rows) {
+    await ctx.db.prepare('UPDATE users SET notified_day = ? WHERE id = ?').bind(today, r.id).run();
+    try {
+      await ctx.tg.call('sendMessage', { chat_id: Number(r.id), text: text(r.lang, 'streak_reminder', { n: r.streak_count }), parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: [[{ text: `🔥 ${text(r.lang, 'play')}`, web_app: { url: ctx.cfg.webAppUrl + '?push=quests' } }]] } });
+      sent++;
+    } catch (e) {
+      if (/403|blocked|deactivated|chat not found/i.test(String(e))) await ctx.db.prepare('UPDATE users SET notify = 0, bot_started = 0 WHERE id = ?').bind(r.id).run();
+    }
+  }
+  if (sent) log('info', 'streak_reminders', { sent });
+  return sent;
+}
 
 /** Manual stock = N "one gift of this collection" units (owned_gift_id manual:<prize>:<k>). Never touches won/delivered units. */
 export async function setManualStock(ctx: Ctx, prizeId: string, n: number) {

@@ -1,6 +1,7 @@
 import { createApp, type AppReq } from './app.ts';
 import { loadConfig, type Env } from './config.ts';
 import { cronTick } from './delivery.ts';
+import { streakReminders } from './bot.ts';
 import { log } from './log.ts';
 import { Tg } from './telegram.ts';
 
@@ -35,6 +36,7 @@ export default {
     const pending: Promise<unknown>[] = [];
     const app = createApp(env.DB, cfg, { tg: new Tg(cfg.botToken), waitUntil: (p) => { pending.push(p); ctx.waitUntil(p); } });
     try { await cronTick(app.ctx); } catch (e) { log('error', 'cron_failed', { err: e instanceof Error ? e.message : String(e) }); }
+    try { await streakReminders(app.ctx); } catch (e) { log('error', 'reminders_failed', { err: e instanceof Error ? e.message : String(e) }); }
   },
 } satisfies ExportedHandler<Env>;
 

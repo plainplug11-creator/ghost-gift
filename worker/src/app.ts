@@ -14,6 +14,10 @@ import { hitRateLimit, inspectSpinTiming, recordFingerprint } from './risk.ts';
 import { Tg, type TgApi } from './telegram.ts';
 import { ApiError, getOrCreateUser, ledger, mustUser, type UserRow } from './users.ts';
 import { notifyAdminNftWon, notifyAdminReview } from './withdrawals.ts';
+import { attachReferral, createFeatures } from './features.ts';
+import { ACH_ADD, effectiveLuck, nextProgress, progressView, writeProgress, type ProgressRow } from './progress.ts';
+import { levelInfo } from './games-rules.ts';
+import { RARITY_RANK } from '../../src/api/types.ts';
 
 export { ApiError };
 
@@ -47,6 +51,7 @@ export function createApp(db: D1Database, cfg: Config, deps: Deps = {}) {
     tg: deps.tg ?? new Tg(cfg.botToken),
     waitUntil: deps.waitUntil ?? ((p) => { void p; }),
   };
+  const features = createFeatures({ db, cfg, bankState: () => bankState(), applyBank: (tx, paid, v) => applyBank(tx, paid, v, false) });
   const bg = (p: Promise<unknown>) => ctx.waitUntil(p.catch((e) => log('error', 'background_error', { err: e instanceof Error ? e.message : String(e) })));
 
   async function handle(req: AppReq): Promise<AppRes> {
@@ -71,7 +76,20 @@ export function createApp(db: D1Database, cfg: Config, deps: Deps = {}) {
       await recordFingerprint(db, cfg, userId, deviceId, req.ip);
       if (await hitRateLimit(db, `api:${userId}`, cfg.rateLimitPerMin)) throw new ApiError(429, 'BUSY', 'rate_limited');
 
-      if (method === 'POST' && path === '/v1/bootstrap') return ok(await bootstrap(tgUser));
+      if (method === 'POST' && path === '/v1/bootstrap') return ok(await bootstrap(tgUser, json(req), deviceId));
+      if (method === 'GET' && path === '/v1/progress') return ok(await features.progress(userId));
+      if (method === 'GET' && path === '/v1/feed') return ok({ feed: await features.feed() });
+      if (method === 'GET' && path === '/v1/leaderboard') return ok(await features.leaderboard(userId));
+      if (method === 'GET' && path === '/v1/history') return ok({ history: await features.history(userId, url.searchParams.get('game') || '') });
+      if (method === 'POST' && (path === '/v1/wheel' || path === '/v1/slots')) {
+        const game = path.endsWith('wheel') ? 'wheel' : 'slots';
+        return ok(await mutate(userId, req, (tx, first) => features.spin(tx, first, userId, game, json(req))));
+      }
+      if (method === 'POST' && path === '/v1/luck/draw') return ok(await mutate(userId, req, (tx) => features.luckDraw(tx, userId)));
+      if (method === 'POST' && path === '/v1/streak/claim') return ok(await mutate(userId, req, (tx) => features.streakClaim(tx, userId)));
+      if (method === 'POST' && path === '/v1/quests/claim') return ok(await mutate(userId, req, (tx) => features.questClaim(tx, userId, String(json(req).id || ''))));
+      if (method === 'POST' && path === '/v1/settings') return ok(await features.settings(userId, json(req)));
+      if (method === 'POST' && path === '/v1/sell-many') return ok(await mutate(userId, req, (tx) => features.sellMany(tx, userId, json(req).uids)));
       if (method === 'GET' && path === '/v1/next-round') return ok(await nextRound(userId));
       if (method === 'GET' && path === '/v1/inventory') return ok({ inventory: await inventory(userId) });
       if (method === 'POST' && path === '/v1/open') {
@@ -142,9 +160,13 @@ export function createApp(db: D1Database, cfg: Config, deps: Deps = {}) {
     }
   }
 
-  async function bootstrap(tgUser: TelegramUser & { language_code?: string }) {
+  async function bootstrap(tgUser: TelegramUser & { language_code?: string }, body: Record<string, any> = {}, deviceId = '') {
     const userId = String(tgUser.id);
-    const u = await getOrCreateUser(db, userId);
+    let u = await getOrCreateUser(db, userId);
+    if (body.ref && !u.stats_opens) {
+      const m = /^ref_(\d{3,15})$/.exec(String(body.ref));
+      if (m && (await attachReferral(db, userId, m[1], deviceId))) u = await mustUser(db, userId);
+    }
     await db.prepare('UPDATE users SET tg_username = ?, tg_first_name = ?, lang = COALESCE(?, lang), last_seen = ? WHERE id = ?')
       .bind(tgUser.username ?? null, tgUser.first_name ?? null, tgUser.language_code ?? null, Date.now(), userId).run();
     return {
@@ -153,7 +175,9 @@ export function createApp(db: D1Database, cfg: Config, deps: Deps = {}) {
       dailyReadyAt: u.daily_ready_at,
       fairness: { serverSeedHash: await seedHash(u.server_seed), clientSeed: u.client_seed, nonce: u.nonce + 1 },
       riskScore: u.risk_score,
-      luckPct: u.luck_pct ?? 0,
+      luckPct: effectiveLuck(u as ProgressRow),
+      stats: { opens: u.stats_opens, wins: u.stats_wins, best: u.stats_best },
+      progress: progressView(u as ProgressRow),
     };
   }
 
@@ -196,7 +220,7 @@ export function createApp(db: D1Database, cfg: Config, deps: Deps = {}) {
     }
 
     const [stock, bank] = await Promise.all([nftTiersInStock(), bankState()]);
-    const full = liveDrops(c, { nftInStock: stock, luckPct: demo ? 0 : u.luck_pct });
+    const full = liveDrops(c, { nftInStock: stock, luckPct: demo ? 0 : effectiveLuck(u as ProgressRow) });
 
     if (demo) {
       const seed = newSeed();
@@ -228,6 +252,7 @@ export function createApp(db: D1Database, cfg: Config, deps: Deps = {}) {
     const roundId = id(8);
 
     tx.guardUser(userId, u.version);
+    const prog = nextProgress(u as ProgressRow, { wager: c.price, game: 'case', daily: c.price === 0, rarityRank: RARITY_RANK[prize.rarity], nft: !!nft }, now);
     let balance = u.balance - c.price;
     let credited: number | undefined;
     let itemUid: string | undefined;
@@ -248,17 +273,22 @@ export function createApp(db: D1Database, cfg: Config, deps: Deps = {}) {
       tx.add('INSERT INTO inventory (uid, user_id, prize_id, case_id, won_at, status, nft_id, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         itemUid, userId, prize.id, c.id, now, 'owned', nft?.id ?? null, nft ? value : null);
     }
+    if (prog.bonus) { balance += prog.bonus; ledger(tx, userId, 'level_reward', prog.bonus, balance, `lvl${prog.levelTo}`); }
     tx.add('UPDATE users SET balance = ?, server_seed = ?, nonce = ?, stats_opens = stats_opens + 1, stats_wins = ?, stats_best = ? WHERE id = ?',
       balance, nextSeed, nonce, wins, best, userId);
+    writeProgress(tx, userId, prog);
+    tx.add('INSERT INTO plays (user_id, game, round_id, bet, payout, prize_id, rarity, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', userId, c.id, roundId, c.price, value, prize.id, prize.rarity, now);
     tx.add(`INSERT INTO fairness_log (round_id, user_id, case_id, server_seed, server_seed_hash, client_seed, nonce, roll, prize_id, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, roundId, userId, c.id, serverSeed, hash, clientSeed, nonce, roll, prize.id, now);
-    applyBank(tx, c.price, value);
+    applyBank(tx, c.price, value + prog.bonus);
     if (isBigPrize(value, c.price, cfg.bigPrizeMinValue)) log('info', 'big_prize', { user: userId, case: c.id, prize: prize.id, value });
 
     return {
       roundId, caseId: c.id, demo: false, prize: shown, itemUid, credited, balance,
       dailyReadyAt: c.price === 0 ? now + DAY : u.daily_ready_at,
       fairness: { serverSeedHash: hash, clientSeed, nonce, serverSeed },
+      progress: { ...levelInfo(prog.xp), xp: prog.xp, levelUp: prog.levelTo > prog.levelFrom ? prog.levelTo : 0, levelBonus: prog.bonus, quests: prog.quests },
+      unlocked: prog.unlocked,
     };
   }
 
@@ -322,6 +352,7 @@ export function createApp(db: D1Database, cfg: Config, deps: Deps = {}) {
     tx.guardUser(userId, u.version);
     tx.add("INSERT INTO tx_guard (n) SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM inventory WHERE uid = ? AND status = 'owned')", uid);
     tx.add("UPDATE inventory SET status = 'withdrawing' WHERE uid = ?", uid);
+    tx.add(ACH_ADD, 'withdraw', 'withdraw', 'withdraw', userId);
     tx.add('INSERT INTO withdrawals (id, user_id, item_uid, prize_id, value, status, reason, created_at, kind, months, nft_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       wid, userId, uid, prize.id, value, status, reasons.join(',') || null, Date.now(), kind, prize.months ?? null, it.nftId);
     const deliveryId = status === 'approved'
@@ -366,9 +397,9 @@ export function createApp(db: D1Database, cfg: Config, deps: Deps = {}) {
     return { balance: row.balance, bigToday: row.day !== day ? 0 : row.big };
   }
 
-  function applyBank(tx: Tx, paid: number, prizeValue: number) {
+  function applyBank(tx: Tx, paid: number, prizeValue: number, countBig = true) {
     const day = todayKyiv();
-    const inc = isBigPrize(prizeValue, paid, cfg.bigPrizeMinValue) ? 1 : 0;
+    const inc = countBig && isBigPrize(prizeValue, paid, cfg.bigPrizeMinValue) ? 1 : 0;
     tx.add('UPDATE bank SET balance = balance + ? - ?, big_prizes_today = CASE WHEN day = ? THEN big_prizes_today + ? ELSE ? END, day = ? WHERE id = 1',
       paid, prizeValue, day, inc, inc, day);
   }

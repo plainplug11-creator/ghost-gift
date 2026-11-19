@@ -2,9 +2,9 @@ import { nftCollection } from './catalog.ts';
 
 // Bot texts (ru default, en for non-CIS languages).
 const ru = {
-  welcome: '👻 <b>Ghost Gift</b> — неоновые кейсы с настоящими подарками Telegram, Premium и NFT.\n\n🎁 Ежедневный бесплатный кейс\n⭐ Честные шансы (provably fair) — каждый бросок можно проверить\n🚀 Выигрыши приходят прямо в Telegram\n\nЖми «Играть» 👇',
+  welcome: '👻 <b>Ghost Gift</b> — неоновая осенняя ночь Нью-Йорка и настоящие подарки Telegram.\n\n🎁 Бесплатный кейс каждый день\n🎡 Колесо до ×10 и 🎰 слоты с джекпотом ×40\n🃏 Карта удачи, серия входов и задания с наградами\n💎 Подарки, Premium и NFT приходят прямо в Telegram\n⚖️ Честные шансы — каждый бросок можно проверить\n\nЖми «Играть» 👇',
   play: 'Играть',
-  help: 'Открой приложение кнопкой «Играть». Вопросы по выводам — ответим здесь же.',
+  help: '❓ <b>Как это работает</b>\n\n1. Жми «Играть» — откроется приложение.\n2. Пополняй звёзды через Telegram Stars или забирай бесплатный кейс раз в сутки.\n3. Выигранные подарки лежат в инвентаре: продай их за звёзды или выведи в Telegram.\n4. Крупные выводы и NFT проверяет модератор — обычно до нескольких часов.\n\nКоманды: /me — мой профиль · /ref — пригласить друзей\nВопросы — пиши прямо сюда.',
   credited: '⭐ Зачислено <b>{n}</b> звёзд. Баланс: <b>{b}</b>.',
   refunded: '↩️ Платёж возвращён: списано {n} ⭐.',
   delivered_gift: '🎁 Твой приз «{item}» отправлен! Загляни в профиль Telegram → Подарки.',
@@ -15,11 +15,22 @@ const ru = {
   review: '⏳ Вывод «{item}» на проверке. Обычно это занимает до нескольких часов.',
   nft_sending: '💎 NFT «{item}» отправляется! Мы передадим его в твой профиль Telegram — обычно в течение нескольких часов. Сообщим, как только он придёт.',
   rejected_nft: 'NFT «{item}» не удалось передать — на баланс зачислено <b>{n}</b> ⭐ (полная стоимость).',
+  ref_welcome: '🎉 Бонус друга: +<b>{n}</b> ⭐ к первому пополнению!',
+  ref_bonus: '👥 Твой друг пополнил баланс — тебе <b>+{n}</b> ⭐ реферального бонуса!',
+  streak_reminder: '🔥 Серия <b>{n}</b> дн. сгорит в полночь! Забери награду дня и бесплатный кейс 👇',
+  ref_info: '👥 <b>Приглашай друзей</b>\n\nТвоя ссылка:\n{link}\n\nДруг получит <b>+10%</b> к первому пополнению, а ты — <b>10%</b> от его пополнений в первые 30 дней.\n\nДрузей: <b>{f}</b> · заработано: <b>{e}</b> ⭐',
+  me: '👻 <b>{name}</b>\n⭐ Баланс: <b>{b}</b>\n🏅 Уровень: <b>{lvl}</b> ({xp} XP)\n🔥 Серия: <b>{s}</b> дн.\n🎰 Круток: <b>{o}</b>',
+  invite_text: 'Залетай в Ghost Gift 👻 — неоновые кейсы с настоящими подарками Telegram. По моей ссылке +10% к первому пополнению!',
+  btn_daily: '🎁 Бесплатный кейс',
+  btn_wheel: '🎡 Колесо',
+  btn_invite: '👥 Пригласить друзей',
+  btn_help: '❓ Помощь',
+  btn_share: '📤 Поделиться ссылкой',
 };
 const en: typeof ru = {
-  welcome: '👻 <b>Ghost Gift</b> — neon cases with real Telegram gifts, Premium and NFTs.\n\n🎁 Free daily case\n⭐ Provably fair odds — every roll is verifiable\n🚀 Winnings arrive right in Telegram\n\nTap “Play” 👇',
+  welcome: '👻 <b>Ghost Gift</b> — a neon autumn night in New York and real Telegram gifts.\n\n🎁 A free case every day\n🎡 Wheel up to ×10 and 🎰 slots with a ×40 jackpot\n🃏 Luck card, login streak and quests with rewards\n💎 Gifts, Premium and NFTs arrive right in Telegram\n⚖️ Provably fair — every roll is verifiable\n\nTap “Play” 👇',
   play: 'Play',
-  help: 'Open the app with the “Play” button. Questions about withdrawals — ask right here.',
+  help: '❓ <b>How it works</b>\n\n1. Tap “Play” to open the app.\n2. Top up with Telegram Stars or grab the free case once a day.\n3. Prizes go to your inventory: sell them for Stars or withdraw to Telegram.\n4. Large withdrawals and NFTs are checked by a moderator — usually within a few hours.\n\nCommands: /me — my profile · /ref — invite friends\nQuestions — just write here.',
   credited: '⭐ <b>{n}</b> Stars credited. Balance: <b>{b}</b>.',
   refunded: '↩️ Payment refunded: {n} ⭐ deducted.',
   delivered_gift: '🎁 Your prize “{item}” has been sent! Check Telegram profile → Gifts.',
@@ -30,6 +41,17 @@ const en: typeof ru = {
   review: '⏳ Withdrawal of “{item}” is under review. Usually up to a few hours.',
   nft_sending: '💎 NFT “{item}” is on its way! We’ll transfer it to your Telegram profile, usually within a few hours, and ping you when it lands.',
   rejected_nft: 'NFT “{item}” could not be transferred — <b>{n}</b> ⭐ (its full value) credited to your balance.',
+  ref_welcome: '🎉 Friend bonus: +<b>{n}</b> ⭐ on your first top-up!',
+  ref_bonus: '👥 Your friend topped up — <b>+{n}</b> ⭐ referral bonus for you!',
+  streak_reminder: '🔥 Your <b>{n}</b>-day streak ends at midnight! Grab today’s reward and the free case 👇',
+  ref_info: '👥 <b>Invite friends</b>\n\nYour link:\n{link}\n\nYour friend gets <b>+10%</b> on the first top-up, you get <b>10%</b> of their top-ups for 30 days.\n\nFriends: <b>{f}</b> · earned: <b>{e}</b> ⭐',
+  me: '👻 <b>{name}</b>\n⭐ Balance: <b>{b}</b>\n🏅 Level: <b>{lvl}</b> ({xp} XP)\n🔥 Streak: <b>{s}</b> days\n🎰 Spins: <b>{o}</b>',
+  invite_text: 'Join me in Ghost Gift 👻 — neon cases with real Telegram gifts. +10% on your first top-up with my link!',
+  btn_daily: '🎁 Free case',
+  btn_wheel: '🎡 Wheel',
+  btn_invite: '👥 Invite friends',
+  btn_help: '❓ Help',
+  btn_share: '📤 Share link',
 };
 export type TextKey = keyof typeof ru;
 export function tx(lang: string | null | undefined, key: TextKey, vars: Record<string, string | number> = {}) {

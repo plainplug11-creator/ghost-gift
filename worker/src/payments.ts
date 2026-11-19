@@ -2,6 +2,8 @@ import type { Ctx } from './ctx.ts';
 import { notifyUser } from './delivery.ts';
 import { log } from './log.ts';
 import { bumpRiskStmt } from './risk.ts';
+import { referralWrites } from './features.ts';
+import { ACH_ADD } from './progress.ts';
 import { ApiError, getOrCreateUser, ledger, mustUser, withRetry } from './users.ts';
 import { randomHex } from './crypto.ts';
 
@@ -73,17 +75,23 @@ export async function creditPayment(ctx: Ctx, p: { telegram_payment_charge_id?: 
     const existing = await ctx.db.prepare('SELECT charge_id FROM payments WHERE charge_id = ?').bind(chargeId).first();
     if (existing) return { status: 'duplicate' as const, chargeId };
     const u = await getOrCreateUser(ctx.db, userId!);
-    const balance = u.balance + stars;
+    const ref = await referralWrites(ctx.db, tx, userId!, chargeId, stars);
+    const welcome = ref?.welcome ?? 0;
+    const balance = u.balance + stars + welcome;
     tx.guardUser(userId!, u.version);
     tx.add('INSERT INTO payments (charge_id, user_id, stars, created_at, refunded) VALUES (?, ?, ?, ?, 0)', chargeId, userId, stars, Date.now());
     tx.add('UPDATE users SET balance = ? WHERE id = ?', balance, userId);
     if (parsed.invoiceId) tx.add("UPDATE invoices SET status = 'paid', charge_id = ?, paid_at = ? WHERE id = ?", chargeId, Date.now(), parsed.invoiceId);
-    ledger(tx, userId!, 'stars_payment', stars, balance, chargeId);
-    return { status: 'credited' as const, chargeId, balance };
+    ledger(tx, userId!, 'stars_payment', stars, balance - welcome, chargeId);
+    if (welcome) ledger(tx, userId!, 'ref_welcome', welcome, balance, chargeId);
+    tx.add(ACH_ADD, 'topup', 'topup', 'topup', userId);
+    return { status: 'credited' as const, chargeId, balance, ref };
   });
   if (res.status === 'credited') {
     log('info', 'payment_credited', { user: userId, stars });
     await notifyUser(ctx, userId, 'credited', { n: stars, b: res.balance });
+    if (res.ref?.welcome) await notifyUser(ctx, userId, 'ref_welcome', { n: res.ref.welcome });
+    if (res.ref?.toRef) await notifyUser(ctx, res.ref.referrer, 'ref_bonus', { n: res.ref.toRef });
   }
   return res;
 }
