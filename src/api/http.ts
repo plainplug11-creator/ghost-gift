@@ -76,19 +76,26 @@ function bumpStats(value: number, caseId: string) {
 }
 const newKey = () => crypto.randomUUID();
 
+/** One bootstrap at a time; progress() calls made meanwhile reuse its payload instead of a second request. */
+let booting: Promise<{ balance: number }> | null = null;
+let progressInFlight: Promise<ProgressInfo> | null = null;
+async function bootOnce(): Promise<{ balance: number }> {
+  const ref = startParam();
+  const r = await req<{ balance: number; inventory: InvItem[]; dailyReadyAt?: number; progress?: ProgressInfo; stats?: { opens: number; wins: number; best: number } }>('/v1/bootstrap', { method: 'POST', body: ref ? { ref } : {} });
+  C.balance = r.balance;
+  C.inv = r.inventory || [];
+  C.dailyReadyAt = r.dailyReadyAt || 0;
+  sync();
+  if (r.stats) store.stats.set(r.stats);
+  if (r.progress) setProgress(r.progress);
+  void syncCases();
+  if (!r.progress) void httpApi.progress().catch(() => {});
+  return { balance: C.balance };
+}
+
 export const httpApi: GameApi = {
-  async bootstrap() {
-    const ref = startParam();
-    const r = await req<{ balance: number; inventory: InvItem[]; dailyReadyAt?: number; progress?: ProgressInfo; stats?: { opens: number; wins: number; best: number } }>('/v1/bootstrap', { method: 'POST', body: ref ? { ref } : {} });
-    C.balance = r.balance;
-    C.inv = r.inventory || [];
-    C.dailyReadyAt = r.dailyReadyAt || 0;
-    sync();
-    if (r.stats) store.stats.set(r.stats);
-    if (r.progress) setProgress(r.progress);
-    void syncCases();
-    void httpApi.progress().catch(() => {});
-    return { balance: C.balance };
+  bootstrap() {
+    return (booting ??= bootOnce().finally(() => { booting = null; }));
   },
   async nextRoundHash() {
     return req<Pick<Fairness, 'serverSeedHash' | 'clientSeed' | 'nonce'>>('/v1/next-round');
@@ -148,9 +155,8 @@ export const httpApi: GameApi = {
   cases: () => CASES,
 
   async progress() {
-    const p = await req<ProgressInfo>('/v1/progress');
-    setProgress(p);
-    return p;
+    if (booting) { await booting.catch(() => {}); const cur = store.progress.get(); if (cur) return cur; }
+    return (progressInFlight ??= req<ProgressInfo>('/v1/progress').then((p) => { setProgress(p); return p; }).finally(() => { progressInFlight = null; }));
   },
   async spin(game, bet) {
     const r = await req<SpinResult>(`/v1/${game}`, { body: { bet }, key: newKey() });

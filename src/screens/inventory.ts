@@ -55,7 +55,7 @@ export function createInventory(): Page {
     const uids = sellable().filter((i) => sel.has(i.uid)).map((i) => i.uid);
     if (!uids.length) return;
     const v = selValue();
-    const ok = h('button', { class: 'btn-primary', 'data-press': '' }, html(`${t('inv.sellN', { n: uids.length })} · ${fmt(v)}${starIcon('star-ico')}`));
+    const ok = h('button', { class: 'btn-primary inv-sell-ok', 'data-press': '' }, html(`${t('inv.sellN', { n: uids.length })} · ${fmt(v)}${starIcon('star-ico')}`));
     const no = h('button', { class: 'btn-ghost', 'data-press': '' }, t('inv.cancel'));
     const sh = openSheet([h('div', { class: 'sh-title' }, t('inv.sellConfirm')), h('p', { class: 'inv-note' }, t('inv.sellConfirmSub')), h('div', { class: 'rs-actions n2' }, ok, no)], { cls: 'sh' });
     no.addEventListener('click', () => void sh.close());

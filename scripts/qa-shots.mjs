@@ -68,6 +68,7 @@ await run('24-profile-scroll', async () => { const p = await open('?tier=high&ta
 await simple('09-profile', '?tier=high&tab=profile', 2000);
 await run('10-inventory', async () => { const p = await open('?tier=high&push=inventory'); await shot(p, '10-inventory'); await p.click('.inv-it'); await sleep(900); await shot(p, '11-withdraw'); await p.close(); });
 await simple('12-topup', '?tier=high&push=topup');
+await run('10b-inv-select', async () => { const p = await open('?tier=high&push=inventory'); await p.click('.inv-sort-b[data-k="value"]'); await sleep(400); await p.click('.inv-sel-btn'); await sleep(400); await p.locator('.inv-it:not(.is-pending)').nth(0).click(); await sleep(200); await p.locator('.inv-it:not(.is-pending)').nth(1).click(); await sleep(500); await shot(p, '10b-inv-select'); await p.click('.inv-bar-sell'); await sleep(900); await shot(p, '10c-inv-sell-confirm'); await p.close(); });
 await run('13-legal', async () => { const p = await open('?tier=high&push=legal:fair'); await shot(p, '13-fairness'); await p.close(); });
 await run('14-terms', async () => { const p = await open('?tier=high&lang=en&push=legal:terms'); await shot(p, '14-terms-en'); await p.close(); });
 await simple('15-home-low', '?tier=low', 2000);

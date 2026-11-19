@@ -509,7 +509,7 @@ html:not([data-tier="low"]) .bs.rs.is-open .rs-n { animation: name-shimmer 3s ea
 /* inventory: sort + bulk sell */
 .inv-tools { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .inv-sort { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 3px; border-radius: 13px; background: rgba(10, 12, 36, 0.7); border: 1px solid var(--glass-border); }
-.inv-sort-b { height: 32px; border-radius: 10px; font: 750 12.5px/1 var(--font); color: var(--text-2); transition: background 0.25s ease, color 0.25s ease; }
+.inv-sort-b { display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap; height: 32px; border-radius: 10px; font: 750 12.5px/1 var(--font); color: var(--text-2); transition: background 0.25s ease, color 0.25s ease; }
 .inv-sort-b.is-on { color: #fff; background: linear-gradient(135deg, rgba(70, 230, 255, 0.28), rgba(166, 92, 255, 0.38)); }
 .inv-sel-btn { flex: none; height: 38px; padding: 0 14px; border-radius: 13px; font: 750 13px/1 var(--font); color: var(--cyan); background: rgba(63, 227, 255, 0.1); border: 1px solid rgba(63, 227, 255, 0.3); }
 .inv-it.is-selecting { transition: transform 0.35s var(--spring-bouncy), box-shadow 0.2s ease; }
@@ -527,3 +527,4 @@ html:not([data-tier="low"]) .bs.rs.is-open .rs-n { animation: name-shimmer 3s ea
 .inv-bar-all { align-self: flex-start; font-size: 12px; font-weight: 750; color: var(--cyan); padding: 0; }
 .inv-bar-sell { height: 44px; padding: 0 20px; border-radius: 14px; font-weight: 800; }
 .pg-inv .pg-scroll { padding-bottom: calc(var(--safe-bottom) + 90px); }
+.inv-sell-ok { white-space: nowrap; font-size: 15px; padding-inline: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 2px; }
