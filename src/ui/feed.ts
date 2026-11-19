@@ -15,7 +15,7 @@ import { isRunning, onRunningChange, reducedMotion } from '../core/perf';
  */
 
 type Rarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
-export interface Win { nick: string; item: I18nKey; icon?: JellyIcon; stars?: number; rarity: Rarity; me?: boolean }
+export interface Win { nick: string; item: I18nKey; icon?: JellyIcon; stars?: number; rarity: Rarity; me?: boolean; id?: number; showcase?: boolean; note?: string }
 
 const NICKS = ['lera_mur', 'Дима', 'kostya.ua', 'Настя', 'maks_k', 'Оля', 'sasha', 'vlad_off', 'Kate', 'Артём', 'yulia.b', 'Ира', 'den4ik', 'Mira', 'Тимур', 'nikita07', 'Ann', 'Богдан'];
 const ITEMS: { item: I18nKey; icon?: JellyIcon; stars?: number[]; rarity: Rarity; w: number }[] = [
@@ -35,6 +35,13 @@ const ITEMS: { item: I18nKey; icon?: JellyIcon; stars?: number[]; rarity: Rarity
 const TOTAL_W = ITEMS.reduce((s, i) => s + i.w, 0);
 const pick = <T,>(a: T[]) => a[(Math.random() * a.length) | 0];
 
+/** Honest filler when there are few real wins: "in the cases" prize showcase — no invented players. */
+export function showcaseWin(i: number): Win {
+  const pool = ITEMS.filter((x) => x.rarity !== 'common');
+  const it = pool[i % pool.length];
+  return { nick: t('feed.inCases'), item: it.item, icon: it.icon, stars: it.stars && it.stars[it.stars.length - 1], rarity: it.rarity, showcase: true };
+}
+
 export function mockWin(): Win {
   let r = Math.random() * TOTAL_W;
   const it = ITEMS.find((i) => (r -= i.w) < 0) ?? ITEMS[0];
@@ -44,11 +51,11 @@ export function mockWin(): Win {
 function chip(w: Win, isNew = false) {
   const ico = w.stars ? starIcon('star-ico') : ji(w.icon!);
   const label = w.stars ? t('item.stars', { n: fmt(w.stars) }) : t(w.item);
-  const el = h('div', { class: `chip r-${w.rarity}${isNew ? ' is-new' : ''}${w.me ? ' is-me' : ''}` });
+  const el = h('div', { class: `chip r-${w.rarity}${isNew ? ' is-new' : ''}${w.me ? ' is-me' : ''}${w.showcase ? ' is-showcase' : ''}` });
   // epic+ chips get a moving shine sweep (desynced per chip)
   if (w.rarity !== 'common' && w.rarity !== 'rare') el.style.setProperty('--sd', `${(Math.random() * 3).toFixed(2)}s`);
   el.append(html(`<span class="chip-ico">${ico}</span>`));
-  const text = h('span', { class: 'chip-text' }, h('span', { class: 'chip-nick' }, w.nick), h('span', { class: 'chip-item' }, label));
+  const text = h('span', { class: 'chip-text' }, h('span', { class: 'chip-nick' }, w.nick), h('span', { class: 'chip-item' }, w.note ? `${label} · ${w.note}` : label));
   el.append(text);
   return el;
 }
@@ -56,7 +63,8 @@ function chip(w: Win, isNew = false) {
 const GAP = 8;
 const SPEED = 30; // px/s — calm, readable
 
-export function createFeed() {
+export function createFeed(opts: { demo?: boolean } = {}) {
+  const demo = opts.demo !== false;
   const root = h('section', { class: 'feed', 'aria-label': t('feed.label') });
   const track = h('div', { class: 'feed-track' });
   root.append(track);
@@ -65,7 +73,8 @@ export function createFeed() {
   const nodes: Node[] = [];
   const history: Win[] = [];          // chips that scrolled off the left (for drag-back)
   const queue: Win[] = [];            // fresh wins waiting to enter
-  const pool: Win[] = Array.from({ length: 14 }, mockWin); // seamless loop source
+  // seamless loop source: demo generator locally, honest prize showcase in production until real wins arrive
+  const pool: Win[] = demo ? Array.from({ length: 14 }, mockWin) : Array.from({ length: 10 }, (_, i) => showcaseWin(i));
   let poolIdx = 0;
 
   let x = 0;
@@ -153,11 +162,20 @@ export function createFeed() {
     el: root,
     mount() {
       viewW = root.clientWidth; fill(); render(); ro.observe(root);
-      schedule(); start();
+      if (demo) schedule();
+      start();
     },
     setActive(a: boolean) { active = a; a ? start(true) : stop(); },
     /** Real-time win (own or from the server stream) → jumps the queue. */
     push(w: Win) { queue.unshift(w); },
+    /** Real recent wins from the server (newest first). Fills the loop; pads with showcase chips if there are few. */
+    setReal(list: Win[], fresh: Win[] = []) {
+      const loop = list.slice(0, 20);
+      for (let i = 0; loop.length < 8; i++) loop.push(showcaseWin(i));
+      pool.splice(0, pool.length, ...loop); poolIdx = 0;
+      for (const f of fresh.reverse()) queue.push(f);
+      while (queue.length > 6) queue.shift();
+    },
     destroy() { stop(); clearTimeout(timer); clearTimeout(resumeT); ro.disconnect(); },
   };
 }

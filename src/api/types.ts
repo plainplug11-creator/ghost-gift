@@ -60,6 +60,8 @@ export interface OpenResult {
   credited?: number;
   balance: number;
   fairness: Fairness;
+  progress?: LevelDelta;
+  unlocked?: AchId[];
 }
 
 export interface InvItem {
@@ -72,6 +74,32 @@ export interface InvItem {
 
 export interface PremiumTier { months: 3 | 6 | 12; price: number; base: number }
 
+export type ApiCode = 'NO_BALANCE' | 'DAILY_COOLDOWN' | 'NOT_FOUND' | 'BUSY' | 'OFFLINE' | 'AUTH' | 'NFT_PENDING' | 'CANCELLED' | 'LIMIT';
 export class ApiError extends Error {
-  constructor(public code: 'NO_BALANCE' | 'DAILY_COOLDOWN' | 'NOT_FOUND' | 'BUSY' | 'OFFLINE' | 'AUTH' | 'NFT_PENDING' | 'CANCELLED', msg = code) { super(msg); }
+  constructor(public code: ApiCode, msg = code) { super(msg); }
 }
+
+// ───────── progression layer (games.ts has the rules) ─────────
+import type { QuestState, QuestId, AchId, GameId, SlotSym } from './games';
+export type { QuestState, QuestId, AchId, GameId, SlotSym };
+export interface LevelDelta { xp: number; level: number; into: number; need: number; levelUp: number; levelBonus: number; quests: QuestState }
+export interface ProgressInfo {
+  xp: number; level: number; into: number; need: number;
+  streak: { count: number; claimedToday: boolean };
+  quests: QuestState;
+  ach: AchId[];
+  luck: { pct: number; until: number; drawnToday: boolean };
+  settings: { hideFeed: boolean; notify: boolean };
+  limits?: { wheel: number; slots: number };
+  ref?: { link: string; friends: number; earned: number };
+  botStarted?: boolean;
+}
+export interface SpinResult {
+  roundId: string; game: GameId; bet: number; mult: number; payout: number; outcome: string;
+  index?: number; faces?: SlotSym[]; balance: number; fairness: Fairness;
+  progress?: LevelDelta; unlocked?: AchId[];
+}
+export interface FeedItem { id: number; game: string; prizeId: string; payout: number; rarity: Rarity; at: number; mult: number; name: string | null }
+export interface LeaderRow { rank: number; name: string | null; level: number; score: number; me?: boolean }
+export interface Leaderboard { week: string; top: LeaderRow[]; me: { rank: number; score: number; level: number } }
+export interface Rewarded { balance: number; unlocked?: AchId[]; progress?: LevelDelta }

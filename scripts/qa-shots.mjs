@@ -14,7 +14,7 @@ const seed = JSON.stringify({ balance: 1250, nonce: 3, clientSeed: 'a1b2c3d4e5f6
   inv: [['cup', 'ghost'], ['prem3', 'diamond'], ['rose', 'neon'], ['rocket', 'neon'], ['heart', 'autumn'], ['diamond', 'star']].map(([prizeId, caseId], i) => ({ uid: 'u' + i, prizeId, caseId, wonAt: now - i * 6e5, status: i === 3 ? 'withdrawing' : 'owned' })) });
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, colorScheme: 'dark', locale: 'ru-RU',
   userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148' });
-await ctx.addInitScript((s) => { if (!localStorage.getItem('gg.mock.v1')) localStorage.setItem('gg.mock.v1', s); }, seed);
+await ctx.addInitScript((s) => { if (!localStorage.getItem('gg.mock.v1')) localStorage.setItem('gg.mock.v1', s); if (!location.search.includes('onb=1')) localStorage.setItem('gg.onb', '1'); else localStorage.removeItem('gg.onb'); }, seed);
 async function open(q, wait = 1600) {
   const p = await ctx.newPage();
   p.on('console', (m) => { if (m.type() === 'error') errors.push(`[${q}] ${m.text()}`); });
@@ -42,7 +42,29 @@ await run('05-rare', () => opening('rose', 'neon', 'rare'));
 await run('05-mythic', () => opening('prem3', 'diamond', 'premium'));
 await run('05-legend', () => opening('cup', 'ghost', 'legendary'));
 await simple('07-wheel', '?tier=high&push=wheel');
+await run('07b-wheel-spin', async () => {
+  const p = await open('?tier=high&push=wheel&force=w9');
+  await p.click('.bet-chip:nth-child(4)'); await p.click('.gk-go'); await sleep(1500); await shot(p, '07b-wheel-spinning');
+  await p.waitForSelector('.pg-wheel:not(.is-spinning)', { timeout: 15000 }); await sleep(900); await shot(p, '07c-wheel-result');
+  await sleep(1800); await shot(p, '07d-levelup'); await p.close();
+});
 await simple('08-slots', '?tier=high&push=slots');
+await run('08b-slots-spin', async () => {
+  const p = await open('?tier=high&push=slots&force=g3');
+  await p.click('.gk-go'); await sleep(900); await shot(p, '08b-slots-spinning');
+  await p.waitForSelector('.pg-slots:not(.is-spinning)', { timeout: 15000 }); await sleep(700); await shot(p, '08c-slots-jackpot'); await p.close();
+});
+await run('17-luck', async () => {
+  const p = await open('?tier=high&push=luck'); await shot(p, '17-luck');
+  await p.click('.lk-card.lk-1', { force: true }); await sleep(1300); await shot(p, '17b-luck-flip'); await sleep(1200); await shot(p, '17c-luck-active'); await p.close();
+});
+await simple('18-quests', '?tier=high&push=quests', 1800);
+await simple('19-leaders', '?tier=high&push=leaders', 1800);
+await simple('20-friends', '?tier=high&push=friends', 1500);
+await simple('21-settings', '?tier=high&push=settings', 1500);
+await run('22-onboarding', async () => { const p = await open('?tier=high&onb=1', 2600); await shot(p, '22-onboarding'); await p.click('.onb-next'); await sleep(900); await shot(p, '22b-onboarding-2'); await p.close(); });
+await run('23-home-scroll', async () => { const p = await open('?tier=high', 2500); await p.$eval('.screen-home .screen-scroll', (e) => e.scrollTo(0, 600)); await sleep(600); await shot(p, '23-home-bottom'); await p.close(); });
+await run('24-profile-scroll', async () => { const p = await open('?tier=high&tab=profile', 2000); await p.$eval('.screen-profile .screen-scroll', (e) => e.scrollTo(0, 700)); await sleep(600); await shot(p, '24-profile-bottom'); await p.close(); });
 await simple('09-profile', '?tier=high&tab=profile', 2000);
 await run('10-inventory', async () => { const p = await open('?tier=high&push=inventory'); await shot(p, '10-inventory'); await p.click('.inv-it'); await sleep(900); await shot(p, '11-withdraw'); await p.close(); });
 await simple('12-topup', '?tier=high&push=topup');

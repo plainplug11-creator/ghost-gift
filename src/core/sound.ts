@@ -239,4 +239,62 @@ export const sfx = {
   },
   /** Reveal = full stinger scaled by rarity. */
   reveal(rank: number, big = false) { this.land(Math.min(4, rank), big); },
+  /** Wheel peg: woody-glass "tk" — pitch follows speed. */
+  peg(speed = 0.5) {
+    if (!live()) return;
+    const c = ctx!, at = c.currentTime + 0.01;
+    if (at - lastTickAt < 0.038) return;
+    lastTickAt = at;
+    voice(900 + speed * 900, at, 0.05, 0.05, 'triangle', 0.15, 500 + speed * 500);
+    noiseBurst(at, 0.02, 0.04, 4200, 2500, 1.1);
+  },
+  /** Slot reel locking into place: low thunk + tiny ring. */
+  reelStop(i = 0) {
+    if (!live()) return;
+    const at = ctx!.currentTime + 0.005;
+    voice(120 - i * 10, at, 0.18, 0.12, 'sine', 0, 60);
+    noiseBurst(at, 0.05, 0.05, 2400, 900, 1);
+    voice([N.E6, N.G6, N.C7][i % 3], at + 0.02, 0.25, 0.02, 'sine', 0.4);
+  },
+  /** Soft spinning hum for slot reels; returns stop(). */
+  spinHum(sec: number) {
+    if (!live()) return () => {};
+    const n = noiseBurst(ctx!.currentTime + 0.01, sec, 0.025, 900, 1600, 2.5);
+    return () => { try { const t = ctx!.currentTime; n.g.gain.cancelScheduledValues(t); n.g.gain.setTargetAtTime(0.0001, t, 0.04); } catch { /* ended */ } };
+  },
+  /** Lose: gentle descending "aww" (never harsh). */
+  lose() {
+    if (!live()) return;
+    const at = ctx!.currentTime + 0.02;
+    voice(N.E5, at, 0.25, 0.035, 'triangle', 0.3, N.C5);
+    voice(N.C5 * 0.9, at + 0.18, 0.45, 0.03, 'triangle', 0.4, N.G5 / 2);
+  },
+  /** Coins counting up (call per step). */
+  coin(i = 0) {
+    if (!live()) return;
+    const at = ctx!.currentTime + 0.005;
+    voice(LADDER[Math.min(LADDER.length - 1, 4 + (i % 7))] * 2, at, 0.08, 0.02, 'sine', 0.3);
+  },
+  /** Card flip: paper swish + sparkle. */
+  flip() {
+    if (!live()) return;
+    const at = ctx!.currentTime + 0.005;
+    noiseBurst(at, 0.22, 0.06, 1800, 5200, 1.4);
+    voice(N.A5, at + 0.12, 0.3, 0.03, 'sine', 0.5); voice(N.E6, at + 0.18, 0.35, 0.025, 'sine', 0.6);
+  },
+  /** Reward claimed: bright two-note chime + shimmer. */
+  claim() {
+    if (!live()) return;
+    const at = ctx!.currentTime + 0.005;
+    [N.G5, N.C6, N.E6].forEach((f, i) => voice(f, at + i * 0.07, 0.5, 0.04, 'triangle', 0.5));
+    for (let i = 0; i < 5; i++) voice([N.C7, N.G6, N.E6][i % 3], at + 0.2 + i * 0.06, 0.3, 0.012, 'sine', 0.8);
+  },
+  /** Level up: rising fanfare with a soft hit. */
+  levelUp() {
+    if (!live()) return;
+    const at = ctx!.currentTime + 0.01;
+    [N.C5, N.E5, N.G5, N.C6, N.E6, N.G6].forEach((f, i) => voice(f, at + i * 0.07, 0.9, 0.04, 'triangle', 0.5));
+    pad([N.C5 / 2, N.G5 / 2, N.C5], at + 0.3, 1.4, 0.03, 600, 2600, 0.05);
+    impact(at + 0.42, 0.1, 0.04);
+  },
 };

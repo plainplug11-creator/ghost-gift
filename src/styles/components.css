@@ -252,3 +252,16 @@
 .game-card:nth-child(4) { animation-delay: 300ms; }
 .luck-banner.enter { animation: enter-up 0.8s var(--spring-soft) 360ms backwards; }
 .tabbar-inner { animation: enter-up 0.8s var(--spring-soft) 200ms backwards; }
+
+/* skeletons (shimmer = transform-only sweep) */
+.skel { position: relative; overflow: hidden; border-radius: var(--r-md); background: rgba(120, 140, 255, 0.07); border: 1px solid rgba(160, 180, 255, 0.06); }
+.skel + .skel { margin-top: 8px; }
+.skel > i { position: absolute; inset: 0; background: linear-gradient(100deg, transparent 20%, rgba(200, 215, 255, 0.09) 50%, transparent 80%); transform: translateX(-100%); }
+html:not(.reduce-motion) .skel > i { animation: skel 1.3s ease-in-out infinite; }
+@keyframes skel { to { transform: translateX(100%); } }
+
+/* offline banner */
+.net-off { position: fixed; left: 50%; top: calc(var(--safe-top) + 8px); z-index: 90; transform: translate(-50%, -150%); opacity: 0; transition: transform 0.5s var(--spring-bouncy), opacity 0.3s ease;
+  padding: 8px 14px; border-radius: 999px; font-size: 13px; font-weight: 700; color: #fff; background: rgba(60, 20, 70, 0.92); border: 1px solid rgba(255, 79, 200, 0.5); box-shadow: 0 8px 20px -8px rgba(0, 0, 0, 0.8); pointer-events: none; white-space: nowrap; }
+.net-off.is-on { transform: translate(-50%, 0); opacity: 1; }
+.net-off.is-back { background: rgba(14, 60, 80, 0.92); border-color: rgba(63, 227, 255, 0.55); }

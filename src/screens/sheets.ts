@@ -1,6 +1,7 @@
 import '../styles/prizes.css';
 import '../styles/cases.css';
 import '../styles/themes.css';
+import { myRefLink, STORY_URL } from '../ui/share';
 import { h, html, starIcon } from '../core/dom';
 import { fmt, t } from '../core/i18n';
 import { store } from '../core/store';
@@ -54,9 +55,6 @@ async function renderCard(p: Prize) {
   return cv.toDataURL('image/png');
 }
 
-/** TODO(config): real bot username / direct Mini App link. */
-const APP_LINK = 'https://t.me/GhostGiftBot/app';
-
 export async function openShare(p: Prize) {
   const preview = h('img', { class: 'sh-img', alt: '' });
   const story = h('button', { class: 'btn-primary', 'data-press': '' }, t('share.story'));
@@ -64,17 +62,11 @@ export async function openShare(p: Prize) {
   const s = openSheet([h('div', { class: 'sh-title' }, t('share.title')), h('div', { class: 'sh-prev' }, preview), h('div', { class: 'rs-actions n2' }, story, chat)], { cls: 'sh' });
   renderCard(p).then((u) => { preview.src = u; preview.classList.add('is-ready'); });
   const text = t('share.text', { item: prizeName(p) });
-  story.addEventListener('click', () => {
-    // shareToStory needs a hosted https image — available once the server renders the card.
-    const mediaUrl = ''; // TODO(server): from POST /api/share-card
-    if (tg.share.canStory() && mediaUrl) tg.share.story(mediaUrl, text, APP_LINK);
-    else toast(t('share.soon'), 'info');
-  });
-  chat.addEventListener('click', () => {
-    const preparedId = ''; // TODO(server): savePreparedInlineMessage → id
-    if (tg.share.canMessage() && preparedId) tg.share.message(preparedId);
-    else { tg.share.link(APP_LINK, text); s.close(); }
-  });
+  // Links carry the player's referral code (bot deep link → /start ref_<id>).
+  const link = myRefLink();
+  if (!tg.share.canStory()) story.remove();
+  story.addEventListener('click', () => { tg.share.story(STORY_URL(), `${text}\n${link}`, link); void s.close(); });
+  chat.addEventListener('click', () => { tg.share.link(link, text); void s.close(); });
 }
 
 export function openRules() {

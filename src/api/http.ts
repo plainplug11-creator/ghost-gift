@@ -1,6 +1,7 @@
 import type { GameApi } from './index';
 import { ApiError } from './types';
-import type { CaseDrop, Fairness, InvItem, OpenResult } from './types';
+import type { CaseDrop, Fairness, FeedItem, InvItem, Leaderboard, OpenResult, ProgressInfo, SpinResult } from './types';
+import { applyProgress, flushCelebrations, patchProgress, setProgress } from '../core/progress';
 import { CASES } from './catalog';
 import { store } from '../core/store';
 
@@ -60,23 +61,33 @@ async function req<T>(path: string, opts: { method?: string; body?: unknown; key
   if (!res.ok) {
     const code = data.error;
     if (res.status === 401 || code === 'UNAUTHORIZED' || code === 'STALE_AUTH') throw new ApiError('AUTH');
-    if (code === 'NO_BALANCE' || code === 'DAILY_COOLDOWN' || code === 'NOT_FOUND' || code === 'BUSY' || code === 'NFT_PENDING') throw new ApiError(code);
+    if (code === 'NO_BALANCE' || code === 'DAILY_COOLDOWN' || code === 'NOT_FOUND' || code === 'BUSY' || code === 'NFT_PENDING' || code === 'LIMIT') throw new ApiError(code);
     throw new ApiError('BUSY');
   }
   return data;
 }
 
 const TIMEOUT_MS = 12_000;
+let pendingStats: { opens: number; wins: number; best: number } | null = null;
+function bumpStats(value: number, caseId: string) {
+  const price = CASES.find((c) => c.id === caseId)?.price ?? 0;
+  const st = store.stats.get();
+  pendingStats = { opens: st.opens + 1, wins: st.wins + (value >= price ? 1 : 0), best: price ? Math.max(st.best, +(value / price).toFixed(1)) : st.best };
+}
 const newKey = () => crypto.randomUUID();
 
 export const httpApi: GameApi = {
   async bootstrap() {
-    const r = await req<{ balance: number; inventory: InvItem[]; dailyReadyAt?: number }>('/v1/bootstrap', { method: 'POST', body: {} });
+    const ref = startParam();
+    const r = await req<{ balance: number; inventory: InvItem[]; dailyReadyAt?: number; progress?: ProgressInfo; stats?: { opens: number; wins: number; best: number } }>('/v1/bootstrap', { method: 'POST', body: ref ? { ref } : {} });
     C.balance = r.balance;
     C.inv = r.inventory || [];
     C.dailyReadyAt = r.dailyReadyAt || 0;
     sync();
+    if (r.stats) store.stats.set(r.stats);
+    if (r.progress) setProgress(r.progress);
     void syncCases();
+    void httpApi.progress().catch(() => {});
     return { balance: C.balance };
   },
   async nextRoundHash() {
@@ -91,10 +102,11 @@ export const httpApi: GameApi = {
         C.inv = [{ uid: r.itemUid, prizeId: r.prize.id, caseId, wonAt: Date.now(), status: 'owned', ...(r.prize.nft ? { value: r.prize.value, nft: r.prize.nft } : {}) }, ...C.inv];
       }
     }
+    if (!demo) { applyProgress(r.progress, r.unlocked, true); bumpStats(r.prize.value, caseId); }
     // store is synced by commit() after the reveal animation
     return r;
   },
-  commit() { sync(); },
+  commit() { sync(); if (pendingStats) { store.stats.set(pendingStats); pendingStats = null; } flushCelebrations(); },
   async sell(uid) {
     const r = await req<{ balance: number; credited: number }>('/v1/sell', { body: { uid }, key: newKey() });
     C.inv = C.inv.filter((x) => x.uid !== uid);
@@ -134,7 +146,66 @@ export const httpApi: GameApi = {
   },
   inventory: () => [...C.inv],
   cases: () => CASES,
+
+  async progress() {
+    const p = await req<ProgressInfo>('/v1/progress');
+    setProgress(p);
+    return p;
+  },
+  async spin(game, bet) {
+    const r = await req<SpinResult>(`/v1/${game}`, { body: { bet }, key: newKey() });
+    C.balance = r.balance; // the header syncs in commit() after the animation
+    const st = store.stats.get();
+    pendingStats = { opens: st.opens + 1, wins: st.wins + (r.payout >= r.bet ? 1 : 0), best: Math.max(st.best, r.mult) };
+    applyProgress(r.progress, r.unlocked, true);
+    patchProgress((p) => ({ ...p }));
+    return r;
+  },
+  async luckDraw() {
+    const r = await req<{ pct: number; active: number; until: number }>('/v1/luck/draw', { body: {}, key: newKey() });
+    patchProgress((p) => ({ ...p, luck: { pct: r.active, until: r.until, drawnToday: true } }));
+    return r;
+  },
+  async streakClaim() {
+    const r = await req<{ count: number; reward: number; balance: number; unlocked?: []; progress?: never }>('/v1/streak/claim', { body: {}, key: newKey() });
+    C.balance = r.balance; sync();
+    patchProgress((p) => ({ ...p, streak: { count: r.count, claimedToday: true } }));
+    applyProgress(r.progress, r.unlocked);
+    return r;
+  },
+  async questClaim(id) {
+    const r = await req<{ id: typeof id; stars: number; xp: number; balance: number }>('/v1/quests/claim', { body: { id }, key: newKey() });
+    C.balance = r.balance; sync();
+    applyProgress((r as never as { progress?: never }).progress, (r as { unlocked?: never }).unlocked);
+    return r;
+  },
+  async saveSettings(s) {
+    const r = await req<{ hideFeed: boolean; notify: boolean; botStarted?: boolean }>('/v1/settings', { body: s });
+    patchProgress((p) => ({ ...p, settings: { hideFeed: r.hideFeed, notify: r.notify } }));
+    return r;
+  },
+  async feed() {
+    return (await req<{ feed: FeedItem[] }>('/v1/feed')).feed;
+  },
+  async leaderboard() {
+    return req<Leaderboard>('/v1/leaderboard');
+  },
+  async sellMany(uids) {
+    const r = await req<{ balance: number; credited: number }>('/v1/sell-many', { body: { uids }, key: newKey() });
+    const set = new Set(uids);
+    C.inv = C.inv.filter((x) => !set.has(x.uid));
+    C.balance = r.balance;
+    sync();
+    return r;
+  },
 };
+
+/** Referral code from the Mini App start parameter (t.me/<bot>/<app>?startapp=ref_123). */
+function startParam(): string {
+  const w = window as unknown as { Telegram?: { WebApp?: { initDataUnsafe?: { start_param?: string } } } };
+  const sp = w.Telegram?.WebApp?.initDataUnsafe?.start_param || '';
+  return /^ref_\d{3,15}$/.test(sp) ? sp : '';
+}
 
 /** Live odds from the server (NFT tiers appear only while in stock); updates CASES in place. */
 async function syncCases() {

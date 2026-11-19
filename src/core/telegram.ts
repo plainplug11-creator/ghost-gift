@@ -64,6 +64,10 @@ const wa: WebApp | undefined = window.Telegram?.WebApp;
 export const inTelegram = !!wa && !!wa.initData;
 
 const at = (v: string) => !!wa && inTelegram && wa.isVersionAtLeast(v);
+/** In-app haptics switch (Settings). */
+let hapticsOn = (() => { try { return localStorage.getItem('gg.haptics') !== '0'; } catch { return true; } })();
+export function setHapticsEnabled(on: boolean) { hapticsOn = on; try { localStorage.setItem('gg.haptics', on ? '1' : '0'); } catch { /* private */ } }
+const hx = (v: string) => hapticsOn && at(v);
 const safe = (fn: () => void) => { try { fn(); } catch { /* old client */ } };
 
 const DEV_USER: TgUser = { id: 1, first_name: 'Алекс', username: 'alex', language_code: 'ru' };
@@ -117,15 +121,15 @@ export const tg = {
 
   /** Haptics are a no-op outside Telegram / on old clients. */
   haptic: {
-    tap: () => at('6.1') && safe(() => wa!.HapticFeedback.impactOccurred('light')),
-    soft: () => at('6.1') && safe(() => wa!.HapticFeedback.impactOccurred('soft')),
-    select: () => at('6.1') && safe(() => wa!.HapticFeedback.selectionChanged()),
-    medium: () => at('6.1') && safe(() => wa!.HapticFeedback.impactOccurred('medium')),
-    heavy: () => at('6.1') && safe(() => wa!.HapticFeedback.impactOccurred('heavy')),
-    rigid: () => at('6.1') && safe(() => wa!.HapticFeedback.impactOccurred('rigid')),
-    success: () => at('6.1') && safe(() => wa!.HapticFeedback.notificationOccurred('success')),
-    warning: () => at('6.1') && safe(() => wa!.HapticFeedback.notificationOccurred('warning')),
-    error: () => at('6.1') && safe(() => wa!.HapticFeedback.notificationOccurred('error')),
+    tap: () => hx('6.1') && safe(() => wa!.HapticFeedback.impactOccurred('light')),
+    soft: () => hx('6.1') && safe(() => wa!.HapticFeedback.impactOccurred('soft')),
+    select: () => hx('6.1') && safe(() => wa!.HapticFeedback.selectionChanged()),
+    medium: () => hx('6.1') && safe(() => wa!.HapticFeedback.impactOccurred('medium')),
+    heavy: () => hx('6.1') && safe(() => wa!.HapticFeedback.impactOccurred('heavy')),
+    rigid: () => hx('6.1') && safe(() => wa!.HapticFeedback.impactOccurred('rigid')),
+    success: () => hx('6.1') && safe(() => wa!.HapticFeedback.notificationOccurred('success')),
+    warning: () => hx('6.1') && safe(() => wa!.HapticFeedback.notificationOccurred('warning')),
+    error: () => hx('6.1') && safe(() => wa!.HapticFeedback.notificationOccurred('error')),
   },
 
   /** "Are you sure?" on close — enabled only while a case is opening. */

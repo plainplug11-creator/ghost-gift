@@ -17,6 +17,8 @@ export default defineConfig(({ command }) => ({
     reportCompressedSize: true,
     // ghost layers come in two sizes: never inline them into the JS (only the set actually shown gets fetched)
     assetsInlineLimit: (file: string) => (file.includes('/assets/ghost/') ? false : undefined),
+    // the local mock API has top-level state but no real side effects: drop it from production builds (VITE_API_URL set)
+    rollupOptions: { treeshake: { moduleSideEffects: (id: string) => !/[\\/]src[\\/]api[\\/]mock\.ts$/.test(id) } },
   },
   server: { host: true },
 }));

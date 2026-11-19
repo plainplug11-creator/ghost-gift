@@ -24,7 +24,7 @@ async function session(throttle) {
   cdp.on('Network.responseReceived', (e) => types.set(e.requestId, e.type));
   cdp.on('Network.loadingFinished', (e) => { const t = types.get(e.requestId) || 'Other'; bytes.byType[t] = (bytes.byType[t] || 0) + e.encodedDataLength; });
   await p.addInitScript(() => {
-    window.__lcp = 0; window.__lt = [];
+    window.__lcp = 0; window.__lt = []; try { localStorage.setItem('gg.onb', '1'); } catch {}
     new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__lcp = e.startTime; }).observe({ type: 'largest-contentful-paint', buffered: true });
     new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__lt.push(e.duration); }).observe({ type: 'longtask', buffered: true });
   });
@@ -43,7 +43,7 @@ async function frames(p, ms, during, cdp) {
   return { ...r, ...busy };
 }
 
-const out = { label, load: [], weight: null, idleHome: [], scrollCase: [], spin: [] };
+const out = { label, load: [], weight: null, idleHome: [], scrollCase: [], spin: [], wheel: [], slots: [] };
 for (let i = 0; i < RUNS; i++) {
   // cold load, throttled
   const s = await session(true);
@@ -67,6 +67,15 @@ for (let i = 0; i < RUNS; i++) {
   await s.p.goto(BASE + '?tier=high&push=case:ghost&autoopen=1&force=cup', { waitUntil: 'load' });
   await s.p.waitForSelector('.op.is-reel', { timeout: 20000 });
   out.spin.push(await frames(s.p, 4000, null, s.cdp));
+  // wheel / slots spins (only builds that have the games)
+  for (const g of ['wheel', 'slots']) {
+    try {
+      await s.p.goto(BASE + `?tier=high&push=${g}`, { waitUntil: 'load' });
+      await s.p.waitForSelector('.gk-go', { timeout: 8000 }); await s.p.waitForTimeout(1500);
+      await s.p.click('.gk-go');
+      out[g].push(await frames(s.p, g === 'wheel' ? 5000 : 3000, null, s.cdp));
+    } catch { /* no game in this build */ }
+  }
   await s.ctx.close();
 }
 const summary = {
@@ -75,6 +84,7 @@ const summary = {
   idleHome: Object.fromEntries(['fps', 'p95', 'long', 'longTasks', 'ltMs', 'cpuPct', 'scriptMs', 'styleLayoutMs'].map((k) => [k, med(out.idleHome.map((x) => x[k]))])),
   scrollCase: Object.fromEntries(['fps', 'p95', 'long', 'longTasks', 'ltMs', 'cpuPct', 'scriptMs', 'styleLayoutMs'].map((k) => [k, med(out.scrollCase.map((x) => x[k]))])),
   spin: Object.fromEntries(['fps', 'p95', 'long', 'longTasks', 'ltMs', 'cpuPct', 'scriptMs', 'styleLayoutMs'].map((k) => [k, med(out.spin.map((x) => x[k]))])),
+  ...Object.fromEntries(['wheel', 'slots'].filter((g) => out[g].length).map((g) => [g, Object.fromEntries(['fps', 'p95', 'long', 'longTasks', 'ltMs', 'cpuPct', 'scriptMs', 'styleLayoutMs'].map((k) => [k, med(out[g].map((x) => x[k]))]))])),
 };
 mkdirSync('shots', { recursive: true });
 writeFileSync(`shots/perf-${label}.json`, JSON.stringify({ summary, raw: out }, null, 1));

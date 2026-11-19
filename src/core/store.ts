@@ -3,7 +3,7 @@
  * daily-claim time, inventory, stats) comes from the server — the client never
  * decides outcomes or balances (anti-cheat rule #1). These are display mirrors.
  */
-import type { InvItem, Prize } from '../api/types';
+import type { InvItem, Prize, ProgressInfo } from '../api/types';
 
 type Fn = () => void;
 
@@ -34,4 +34,10 @@ export const store = {
   lastWin: signal<Prize | null>(null),
   /** Sound effects (muted by default). */
   sound: signal(false),
+  /** Levels, streak, quests, achievements, luck card, limits (server mirror). */
+  progress: signal<ProgressInfo | null>(null),
+  /** Haptic feedback (on by default). */
+  haptics: signal(localStorage.getItem('gg.haptics') !== '0'),
+  /** Reduced motion: system setting OR the in-app switch. */
+  calm: signal(localStorage.getItem('gg.calm') === '1'),
 };

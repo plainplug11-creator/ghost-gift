@@ -11,7 +11,7 @@
  *   - rate-limits and makes openCase idempotent by a client-generated request id
  * The client must not decide real outcomes in production.
  */
-import type { CaseDef, Fairness, InvItem, OpenResult } from './types';
+import type { CaseDef, Fairness, FeedItem, InvItem, Leaderboard, OpenResult, ProgressInfo, Rewarded, SpinResult, GameId, QuestId } from './types';
 export { ApiError } from './types';
 import { mockApi, mockNftStock } from './mock';
 import { httpApi } from './http';
@@ -35,6 +35,18 @@ export interface GameApi {
   topUp(stars: number): Promise<{ status: 'paid' | 'pending' | 'cancelled' | 'failed'; balance: number }>;
   inventory(): InvItem[];
   cases(): CaseDef[];
+
+  // ── progression & games (server-side outcomes) ──
+  progress(): Promise<ProgressInfo>;
+  spin(game: GameId, bet: number): Promise<SpinResult>;
+  luckDraw(): Promise<{ pct: number; active: number; until: number }>;
+  streakClaim(): Promise<Rewarded & { count: number; reward: number }>;
+  questClaim(id: QuestId): Promise<Rewarded & { id: QuestId; stars: number; xp: number }>;
+  saveSettings(s: { hideFeed?: boolean; notify?: boolean }): Promise<{ hideFeed: boolean; notify: boolean; botStarted?: boolean }>;
+  /** Real recent wins; null = no server (the feed keeps its demo generator). */
+  feed(): Promise<FeedItem[] | null>;
+  leaderboard(): Promise<Leaderboard>;
+  sellMany(uids: string[]): Promise<{ balance: number; credited: number }>;
 }
 
 export const api: GameApi = import.meta.env.VITE_API_URL ? httpApi : mockApi;

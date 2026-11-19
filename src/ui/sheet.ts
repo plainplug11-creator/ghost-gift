@@ -1,4 +1,4 @@
-import { h } from '../core/dom';
+import { h, starText } from '../core/dom';
 import { reducedMotion } from '../core/perf';
 import { pushBack, removeBack } from './router';
 
@@ -53,7 +53,7 @@ export function openSheet(content: Node[], opts: { cls?: string; dismissable?: b
 
 /** Lightweight toast at the top (below the Telegram controls). */
 export function toast(text: string, kind: 'ok' | 'info' | 'err' = 'ok') {
-  const el = h('div', { class: `toast toast-${kind}`, role: 'status' }, text);
+  const el = h('div', { class: `toast toast-${kind}`, role: 'status' }, starText(text));
   document.body.append(el);
   void el.offsetWidth; el.classList.add('is-in');
   setTimeout(() => { el.classList.remove('is-in'); setTimeout(() => el.remove(), 400); }, 2200);

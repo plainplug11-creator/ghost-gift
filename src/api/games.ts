@@ -133,13 +133,15 @@ export function levelInfo(xp: number) {
 /** Reward for reaching `level`: 1 % of the wager that step took (house edge is ≥ 12 %). */
 export const levelReward = (level: number) => (level <= 1 ? 0 : Math.max(1, Math.floor(xpStep(level - 1) * 0.01)));
 /** Ghost collection: tinted ghosts unlocked by level. */
+/** Tints stay inside the neon palette (blue · cyan · violet · magenta). */
 export const GHOSTS = [
-  { id: 'classic', level: 1, hue: 0 },
-  { id: 'mint', level: 3, hue: -70 },
-  { id: 'rose', level: 5, hue: 70 },
-  { id: 'aqua', level: 10, hue: -120 },
-  { id: 'gold', level: 20, hue: 160 },
+  { id: 'classic', level: 1, filter: '' },
+  { id: 'ice', level: 3, filter: 'hue-rotate(-55deg)' },
+  { id: 'orchid', level: 5, filter: 'hue-rotate(30deg) saturate(1.2)' },
+  { id: 'rose', level: 10, filter: 'hue-rotate(65deg) saturate(1.3)' },
+  { id: 'aurora', level: 20, filter: 'hue-rotate(-55deg) saturate(2) brightness(1.15)' },
 ] as const;
+export const ghostFilter = (level: number) => [...GHOSTS].reverse().find((g) => level >= g.level)?.filter ?? '';
 
 // ───────────── Daily streak ─────────────
 /** 7-day calendar, claimed once per Kyiv day; missing a day restarts at day 1. */

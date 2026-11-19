@@ -11,7 +11,7 @@ import { tg } from '../core/telegram';
  * and bottom sheets: the top-most handler wins (sheet → page → nothing).
  */
 export type Tab = 'games' | 'profile';
-export type PushId = 'cases' | 'case' | 'daily' | 'inventory' | 'wheel' | 'slots' | 'luck' | 'topup' | 'legal';
+export type PushId = 'cases' | 'case' | 'daily' | 'inventory' | 'wheel' | 'slots' | 'luck' | 'topup' | 'legal' | 'quests' | 'leaders' | 'friends' | 'settings';
 
 export interface Page { el: HTMLElement; onShow?(): void; onHide?(): void; destroy?(): void; /** return false to veto back (e.g. mid-opening) */ onBack?(): boolean | void; /** @internal */ backFn?: () => void }
 type TabScreen = { el: HTMLElement; onShow?(): void; onHide?(): void };
@@ -60,12 +60,19 @@ const PAGES: Partial<Record<PushId, (p: Params) => Promise<Page>>> = {
   inventory: () => import('../screens/inventory').then((m) => m.createInventory()),
   legal: (p) => import('../screens/legal').then((m) => m.createLegal(p.id as never)),
   topup: () => import('../screens/topup').then((m) => m.createTopup()),
+  wheel: () => import('../screens/wheel').then((m) => m.createWheel()),
+  slots: () => import('../screens/slots').then((m) => m.createSlots()),
+  luck: () => import('../screens/luck').then((m) => m.createLuck()),
+  quests: () => import('../screens/quests').then((m) => m.createQuests()),
+  leaders: () => import('../screens/leaders').then((m) => m.createLeaders()),
+  friends: () => import('../screens/friends').then((m) => m.createFriends()),
+  settings: () => import('../screens/settings').then((m) => m.createSettings()),
 };
 
 /** Warm lazy modules when the main thread is idle. */
 export function prefetch() {
   const idle = (window as Window & { requestIdleCallback?: (cb: () => void) => void }).requestIdleCallback ?? ((cb: () => void) => setTimeout(cb, 1200));
-  idle(() => { lazyTabs.forEach((_, id) => ensure(id)); import('../screens/cases'); import('../screens/soon'); });
+  idle(() => { lazyTabs.forEach((_, id) => ensure(id)); import('../screens/cases'); import('../screens/wheel'); import('../screens/slots'); });
 }
 
 let busy = false;

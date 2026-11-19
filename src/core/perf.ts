@@ -25,7 +25,14 @@ function detectTier(): Tier {
 
 const forced = new URLSearchParams(location.search).get('tier') as Tier | null;
 export const tier: Tier = forced ?? detectTier();
-export const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const sysReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+/** System "reduce motion" OR the in-app Calm mode switch (live binding — read it at use time). */
+export let reducedMotion = sysReduced || (() => { try { return localStorage.getItem('gg.calm') === '1'; } catch { return false; } })();
+export function setCalm(on: boolean) {
+  try { localStorage.setItem('gg.calm', on ? '1' : '0'); } catch { /* private */ }
+  reducedMotion = sysReduced || on;
+  document.documentElement.classList.toggle('reduce-motion', reducedMotion);
+}
 
 /** Visible + app active. Ambient loops subscribe to this. */
 type Listener = (running: boolean) => void;

@@ -29,3 +29,7 @@ export function html(markup: string): DocumentFragment {
 export const CURRENCY_URL = currencyUrl;
 export const starIcon = (cls = 'star-ico') =>
   `<img class="${cls}" src="${currencyUrl}" alt="" decoding="async" draggable="false">`;
+
+const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+/** Plain text where "⭐" becomes the ghost-star currency icon. */
+export const starText = (s: string) => html(esc(s).replace(/\s?⭐/g, starIcon('star-ico star-inline')));

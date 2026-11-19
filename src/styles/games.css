@@ -185,3 +185,41 @@
 [data-tier="mid"] .game-card, [data-tier="mid"] .luck-banner { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--glass-solid); }
 [data-tier="low"] .spk, [data-tier="low"] .lb-art .ji, [data-tier="low"] .art-floor, [data-tier="low"] .art-slots img { animation: none !important; }
 [data-tier="low"] .spk { opacity: 0.7; }
+
+/* luck banner states */
+.luck-banner.is-ready .lb-pill { color: #fff; border: none; background: linear-gradient(120deg, #ff5ccc, #a65cff); box-shadow: 0 4px 14px -4px rgba(255, 79, 200, 0.9); }
+html:not(.reduce-motion) .luck-banner.is-ready .lb-pill { animation: lb-pulse 1.8s ease-in-out infinite; }
+@keyframes lb-pulse { 50% { transform: scale(1.08); } }
+.luck-banner.is-on { border-color: rgba(63, 227, 255, 0.45); }
+.luck-banner.is-on .lb-pill { font-size: 13px; font-weight: 900; color: #fff; background: linear-gradient(120deg, rgba(63, 227, 255, 0.35), rgba(90, 125, 255, 0.35)); }
+.luck-banner.is-on .lb-sub { color: #bdf6ff; font-variant-numeric: tabular-nums; }
+
+/* level / streak / quests strip */
+.ps { display: flex; align-items: center; gap: 10px; margin: 0 var(--pad) 12px; width: calc(100% - 2 * var(--pad)); padding: 8px 10px; border-radius: 18px; text-align: left;
+  background: var(--glass-bg); border: 1px solid var(--glass-border); box-shadow: var(--glass-hi); animation: card-in 0.9s var(--spring-soft) 120ms backwards; }
+.ps.is-loading { opacity: 0.55; }
+.ps-lv { flex: none; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font: 900 16px/1 var(--font); color: #fff;
+  background: radial-gradient(circle at 35% 30%, #4a3aa8, #1a1450); box-shadow: 0 0 0 2px rgba(122, 92, 255, 0.8), 0 0 16px rgba(166, 92, 255, 0.6); }
+.ps-mid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.ps-top { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-size: 12px; }
+.ps-top b { font-size: 13px; font-weight: 750; }
+.ps-xp { color: var(--text-3); font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ps-bar { height: 5px; border-radius: 3px; overflow: hidden; background: rgba(160, 180, 255, 0.12); }
+.ps-bar i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, #46e6ff, #a65cff, #ff5ccc); transform-origin: 0 50%; transform: scaleX(0); transition: transform 1s var(--spring-soft); }
+.ps-chip { flex: none; min-width: 34px; height: 30px; padding: 0 8px; border-radius: 11px; display: inline-flex; align-items: center; justify-content: center; gap: 2px; font-size: 13px; font-weight: 850;
+  background: rgba(16, 20, 54, 0.7); border: 1px solid rgba(160, 180, 255, 0.14); color: var(--text-2); }
+.ps-fire { font-size: 13px; filter: hue-rotate(250deg) saturate(1.4); }
+.ps-streak.is-hot { border-color: rgba(255, 140, 230, 0.55); color: #fff; }
+.ps-q.is-ready { color: #fff; border: none; background: linear-gradient(120deg, #ff5ccc, #a65cff); }
+html:not(.reduce-motion) .ps-q.is-ready { animation: lb-pulse 1.8s ease-in-out infinite; }
+
+/* quests · leaders · friends tiles */
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px var(--pad) 0; animation: card-in 0.9s var(--spring-soft) 320ms backwards; }
+.tile { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px 10px; border-radius: 18px; background: var(--glass-bg); border: 1px solid var(--glass-border); box-shadow: var(--glass-hi), var(--shadow-card); }
+.tile-ico .ji { --ji: 40px; display: block; }
+.tile-t { font-size: 12.5px; font-weight: 750; }
+.t-quests { background: radial-gradient(90% 90% at 50% 0%, rgba(63, 227, 255, 0.12), transparent 70%), var(--glass-bg); }
+.t-leaders { background: radial-gradient(90% 90% at 50% 0%, rgba(166, 92, 255, 0.16), transparent 70%), var(--glass-bg); }
+.t-friends { background: radial-gradient(90% 90% at 50% 0%, rgba(255, 79, 200, 0.14), transparent 70%), var(--glass-bg); }
+[data-tier="low"] .ps, [data-tier="low"] .tile, [data-tier="mid"] .ps, [data-tier="mid"] .tile, .no-blur .ps, .no-blur .tile { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--glass-solid); }
+.chip.is-showcase .chip-nick { color: var(--cyan); opacity: 0.85; }
