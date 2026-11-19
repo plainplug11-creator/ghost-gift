@@ -1,3 +1,4 @@
+import { flyReward } from './reward';
 import { h, html, starIcon } from '../core/dom';
 import { fmt, t } from '../core/i18n';
 import { store } from '../core/store';
@@ -61,6 +62,7 @@ export function resultBanner() {
         const k = Math.min(1, (now - t0) / D), e = 1 - Math.pow(1 - k, 3);
         b.textContent = fmt(Math.round(payout * e));
         if (k < 1) raf = requestAnimationFrame(step);
+        else if (win) flyReward(b, payout, '');
       };
       raf = requestAnimationFrame(step);
     },

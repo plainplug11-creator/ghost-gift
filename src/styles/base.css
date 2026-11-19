@@ -73,3 +73,5 @@ h1, h2 { font-weight: inherit; }
 /* off-screen after a covering transition (see hideAfter) */
 .is-gone { visibility: hidden !important; content-visibility: hidden; }
 .bg.has-video .bg-poster { visibility: hidden; }
+/* in-app calm mode = same treatment as the system "reduce motion" setting */
+html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.12s !important; }

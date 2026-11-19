@@ -182,3 +182,20 @@ html:not(.reduce-motion) .onb-slide.is-on .onb-trio .ji:nth-child(3) { animation
 .onb-dots i { width: 7px; height: 7px; border-radius: 4px; background: rgba(200, 210, 255, 0.3); transition: width 0.4s var(--spring-soft), background 0.3s ease; }
 .onb-dots i.is-on { width: 24px; background: linear-gradient(90deg, #46e6ff, #ff5ccc); }
 .onb-next { position: relative; width: 100%; max-width: 380px; height: 54px; border-radius: 17px; font-size: 17px; font-weight: 800; }
+
+/* reward fly (ui/reward.ts) */
+.rw-layer { position: fixed; inset: 0; pointer-events: none; z-index: 900; overflow: hidden; contain: strict; }
+.rw-star { position: absolute; left: -99px; top: 0; width: 22px; height: 22px; will-change: transform, opacity; }
+.rw-star .star-ico { width: 22px; height: 22px; filter: drop-shadow(0 0 6px rgba(120, 220, 255, 0.9)); }
+.rw-tag { position: absolute; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; font: 900 22px/1 var(--font); color: #fff;
+  text-shadow: 0 0 12px rgba(70, 230, 255, 0.85), 0 2px 8px rgba(0, 0, 20, 0.8); }
+.rw-tag .star-ico { width: 22px; height: 22px; }
+
+/* page content enters in a short cascade (consistent with legal/home) */
+.mt-scroll > *, .gk-scroll > * { animation: enter-up 0.55s var(--spring-soft) backwards; }
+.mt-scroll > :nth-child(2), .gk-scroll > :nth-child(2) { animation-delay: 50ms; }
+.mt-scroll > :nth-child(3), .gk-scroll > :nth-child(3) { animation-delay: 100ms; }
+.mt-scroll > :nth-child(4), .gk-scroll > :nth-child(4) { animation-delay: 150ms; }
+.mt-scroll > :nth-child(n+5), .gk-scroll > :nth-child(n+5) { animation-delay: 200ms; }
+/* primary buttons light up a touch while pressed */
+.btn-primary[data-press].is-pressed { filter: brightness(1.12) saturate(1.1); }

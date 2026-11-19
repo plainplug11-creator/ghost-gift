@@ -1,3 +1,4 @@
+import { flyReward } from '../ui/reward';
 import '../styles/cases.css';
 import '../styles/play.css';
 import '../styles/meta.css';
@@ -48,8 +49,10 @@ export function createQuests(): Page {
     btn.addEventListener('click', async () => {
       if (busy) return; busy = true; unlockAudio(); btn.disabled = true;
       try {
+        const from = btn.getBoundingClientRect();
         const r = await api.streakClaim();
         sfx.claim(); tg.haptic.success();
+        flyReward(from, r.reward);
         toast(r.reward > 0 ? t('quests.streakGot', { r: r.reward, n: r.count }) : t('quests.streakGot0', { n: r.count }), 'ok');
       } catch (e) { toast(apiErrorText(e), 'err'); btn.disabled = false; }
       finally { busy = false; }
@@ -78,8 +81,10 @@ export function createQuests(): Page {
         if (!ready) { if (go) navigate.push(go); return; }
         if (busy) return; busy = true; unlockAudio(); act.disabled = true;
         try {
+          const from = act.getBoundingClientRect();
           const r = await api.questClaim(d.id);
           sfx.claim(); tg.haptic.success();
+          flyReward(from, r.stars, r.stars > 0 ? undefined : `+${r.xp} XP`);
           toast(r.stars > 0 ? t('quests.got', { s: r.stars, x: r.xp }) : t('quests.gotXp', { x: r.xp }), 'ok');
         } catch (e) { toast(apiErrorText(e), 'err'); act.disabled = false; }
         finally { busy = false; }

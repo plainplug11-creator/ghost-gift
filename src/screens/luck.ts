@@ -1,3 +1,4 @@
+import { flyReward } from '../ui/reward';
 import '../styles/cases.css';
 import '../styles/play.css';
 import { h, html, starText } from '../core/dom';
@@ -114,6 +115,7 @@ export function createLuck(): Page {
       await new Promise((res) => setTimeout(res, reducedMotion ? 0 : 520));
       const rank = r.pct >= 10 ? 4 : r.pct >= 7 ? 3 : r.pct >= 5 ? 2 : 1;
       sfx.land(rank, rank >= 4); tg.haptic.success();
+      flyReward(chosen.el, 0, t('luck.flyTag', { p: r.pct }));
       if (rank >= 2) confetti(fx, { colors: ['#3fe3ff', '#a65cff', '#ff5ccc', '#ffd66e'], count: 50 + rank * 25, y: 0.35 });
       if (r.active > r.pct) toast(t('luck.kept', { p: r.active }), 'info');
       page.classList.add('is-drawn');

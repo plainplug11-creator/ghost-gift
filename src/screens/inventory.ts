@@ -1,3 +1,4 @@
+import { flyReward } from '../ui/reward';
 import '../styles/prizes.css';
 import '../styles/cases.css';
 import '../styles/themes.css';
@@ -62,8 +63,10 @@ export function createInventory(): Page {
     ok.addEventListener('click', async () => {
       ok.disabled = true;
       try {
+        const from = ok.getBoundingClientRect();
         const r = await api.sellMany(uids);
         sfx.coin(); tg.haptic.success();
+        flyReward(from, r.credited);
         toast(t('inv.soldN', { n: uids.length, v: fmt(r.credited) }), 'ok');
         void sh.close(); setSelecting(false);
       } catch (e) { ok.disabled = false; toast(apiErrorText(e), 'err'); }

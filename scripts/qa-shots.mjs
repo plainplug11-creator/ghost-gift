@@ -58,6 +58,7 @@ await run('17-luck', async () => {
   const p = await open('?tier=high&push=luck'); await shot(p, '17-luck');
   await p.click('.lk-card.lk-1', { force: true }); await sleep(1300); await shot(p, '17b-luck-flip'); await sleep(1200); await shot(p, '17c-luck-active'); await p.close();
 });
+await run('18b-streak-claim', async () => { const p = await open('?tier=high&push=quests', 1800); await p.click('.mt-claim'); await sleep(420); await shot(p, '18b-streak-fly'); await sleep(1500); await shot(p, '18c-streak-claimed'); await p.close(); });
 await simple('18-quests', '?tier=high&push=quests', 1800);
 await simple('19-leaders', '?tier=high&push=leaders', 1800);
 await simple('20-friends', '?tier=high&push=friends', 1500);
