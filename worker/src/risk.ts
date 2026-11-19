@@ -41,6 +41,22 @@ export async function hitRateLimit(db: D1Database, key: string, limit: number, w
   return (row?.count ?? 1) > limit;
 }
 
+/**
+ * Token bucket for general API traffic: `burst` requests can arrive back-to-back (fast screen switching,
+ * app reloads), then tokens refill at `perMin`. A denied request leaves at most one token of debt, so
+ * hammering keeps you throttled while a normal user never notices. Money endpoints keep their own
+ * strict fixed-window limit (hitRateLimit) plus autoclicker checks.
+ */
+export async function hitBurstLimit(db: D1Database, key: string, perMin: number, burst: number): Promise<boolean> {
+  const now = Date.now();
+  const row = await db.prepare(`INSERT INTO rate (key, window_start, count) VALUES (?1, ?2, ?3 - 1)
+    ON CONFLICT(key) DO UPDATE SET
+      count = MAX(-1.0, MIN(?3 * 1.0, count + (?2 - window_start) * ?4) - 1),
+      window_start = ?2
+    RETURNING count`).bind(key, now, burst, perMin / 60_000).first<{ count: number }>();
+  return (row?.count ?? 0) < 0;
+}
+
 export async function inspectSpinTiming(db: D1Database, cfg: Config, userId: string): Promise<{ autoclicker: boolean }> {
   const now = Date.now();
   const [, , sel] = await db.batch([

@@ -12,6 +12,7 @@ export interface Env {
   NEW_ACCOUNT_HOURS?: string;
   REVIEW_RISK_SCORE?: string;
   RATE_LIMIT_PER_MIN?: string;
+  RATE_BURST?: string;
   OPEN_LIMIT_PER_MIN?: string;
   AUTOCLICK_MIN_MS?: string;
   AUTOCLICK_REGULAR_STDDEV_MS?: string;
@@ -34,6 +35,8 @@ export interface Config {
   newAccountHours: number;
   reviewRiskScore: number;
   rateLimitPerMin: number;
+  /** general API bucket size (requests allowed back-to-back before the per-minute refill rate applies) */
+  rateBurst: number;
   openLimitPerMin: number;
   autoclickMinMs: number;
   autoclickRegularStddevMs: number;
@@ -58,7 +61,8 @@ export function loadConfig(env: Partial<Env>, overrides: Partial<Config> = {}): 
     withdrawReviewMin: num(env.WITHDRAW_REVIEW_MIN, 1500),
     newAccountHours: num(env.NEW_ACCOUNT_HOURS, 48),
     reviewRiskScore: num(env.REVIEW_RISK_SCORE, 60),
-    rateLimitPerMin: num(env.RATE_LIMIT_PER_MIN, 40),
+    rateLimitPerMin: num(env.RATE_LIMIT_PER_MIN, 60),
+    rateBurst: num(env.RATE_BURST, 60),
     openLimitPerMin: num(env.OPEN_LIMIT_PER_MIN, 20),
     autoclickMinMs: num(env.AUTOCLICK_MIN_MS, 450),
     autoclickRegularStddevMs: num(env.AUTOCLICK_REGULAR_STDDEV_MS, 25),

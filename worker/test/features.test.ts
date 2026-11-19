@@ -167,6 +167,7 @@ describe('inventory, social, referrals', () => {
     await a.db.prepare("INSERT INTO plays (user_id, game, round_id, bet, payout, prize_id, rarity, created_at) VALUES (?, 'wheel', 'r1', 50, 500, 'w0', 'legendary', ?)").bind(u, Date.now()).run();
     let f = await req(a, 'GET', '/v1/feed', u);
     expect(f.body.feed.find((x: any) => x.payout === 500 && x.name === `P${u}`)).toBeTruthy();
+    expect(f.body.stats.plays24h).toBeGreaterThan(0); expect(f.body.stats.players24h).toBeGreaterThan(0);
     await req(a, 'POST', '/v1/settings', u, { hideFeed: true });
     f = await req(a, 'GET', '/v1/feed', u);
     expect(f.body.feed.find((x: any) => x.payout === 500).name).toBeNull();
@@ -218,5 +219,18 @@ describe('inventory, social, referrals', () => {
     expect(n1).toBeGreaterThanOrEqual(1);
     const n2 = await streakReminders(a.app.ctx, at, 500);
     expect(n2).toBe(0);
+  });
+});
+
+import { tx as botText } from '../src/texts.ts';
+describe('bot texts', () => {
+  it('uses Ukrainian for uk, Russian for ru/unknown, English otherwise; localizes built-in prize names', () => {
+    expect(botText('uk', 'play')).toBe('Грати');
+    expect(botText('ru', 'play')).toBe('Играть');
+    expect(botText(undefined, 'play')).toBe('Играть');
+    expect(botText('de', 'play')).toBe('Play');
+    expect(botText('uk', 'delivered_gift', { item: 'Роза' })).toContain('«Троянда»');
+    expect(botText('en', 'delivered_gift', { item: 'Роза' })).toContain('“Rose”');
+    expect(botText('uk', 'delivered_nft', { item: 'Plush Pepe #12' })).toContain('Plush Pepe #12');
   });
 });

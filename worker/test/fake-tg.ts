@@ -37,7 +37,7 @@ export function makeFlowApp(over: Partial<Config> = {}) {
   const pending: Promise<unknown>[] = [];
   const cfg = loadConfig({}, {
     botToken: TOKEN, bankStart: 1_000_000, bankReserve: 0, dailyBigPrizeCap: 1000,
-    rateLimitPerMin: 10_000, openLimitPerMin: 10_000, autoclickMinMs: 0, autoclickRegularStddevMs: -1,
+    rateLimitPerMin: 10_000, rateBurst: 10_000, openLimitPerMin: 10_000, autoclickMinMs: 0, autoclickRegularStddevMs: -1,
     adminClaimCode: 'c0ffee', ...over,
   });
   const app = createApp(env.DB, cfg, { tg, waitUntil: (p) => { pending.push(p); } });

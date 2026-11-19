@@ -176,11 +176,17 @@ export function createFeatures(d: FeatureDeps) {
       WHERE p.created_at > ? AND p.payout >= 15 AND p.payout > p.bet
       ORDER BY p.id DESC LIMIT 24`).bind(Date.now() - 7 * 86400_000)
       .all<{ id: number; game: string; prizeId: string; payout: number; bet: number; rarity: string; at: number; name: string | null; hidden: number }>();
-    return (r.results ?? []).map((x) => ({
-      id: x.id, game: x.game, prizeId: x.prizeId, payout: x.payout, rarity: x.rarity, at: x.at,
-      mult: x.bet ? +(x.payout / x.bet).toFixed(1) : 0,
-      name: x.hidden || !x.name ? null : x.name.slice(0, 14),
-    }));
+    const st = await db.prepare('SELECT COUNT(*) AS plays, COUNT(DISTINCT user_id) AS players, COALESCE(MAX(payout), 0) AS best FROM plays WHERE created_at > ?')
+      .bind(Date.now() - 86400_000).first<{ plays: number; players: number; best: number }>();
+    return {
+      feed: (r.results ?? []).map((x) => ({
+        id: x.id, game: x.game, prizeId: x.prizeId, payout: x.payout, rarity: x.rarity, at: x.at,
+        mult: x.bet ? +(x.payout / x.bet).toFixed(1) : 0,
+        name: x.hidden || !x.name ? null : x.name.slice(0, 14),
+      })),
+      // real 24h activity (every play, not only wins) — lets the client say how lively it is without inventing anything
+      stats: { plays24h: st?.plays ?? 0, players24h: st?.players ?? 0, best24h: st?.best ?? 0 },
+    };
   }
 
   async function leaderboard(userId: string) {

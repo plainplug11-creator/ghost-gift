@@ -10,7 +10,7 @@ import { PREMIUM_STARS, enqueueDelivery, processDelivery } from './delivery.ts';
 import { fairRoll, newSeed, seedHash, verifyFair } from './fair.ts';
 import { log } from './log.ts';
 import { createTopup, invoiceStatus } from './payments.ts';
-import { hitRateLimit, inspectSpinTiming, recordFingerprint } from './risk.ts';
+import { hitBurstLimit, hitRateLimit, inspectSpinTiming, recordFingerprint } from './risk.ts';
 import { Tg, type TgApi } from './telegram.ts';
 import { ApiError, getOrCreateUser, ledger, mustUser, type UserRow } from './users.ts';
 import { notifyAdminNftWon, notifyAdminReview } from './withdrawals.ts';
@@ -74,11 +74,11 @@ export function createApp(db: D1Database, cfg: Config, deps: Deps = {}) {
       const userId = String(tgUser.id);
       const deviceId = header(req.headers, 'x-device-id');
       await recordFingerprint(db, cfg, userId, deviceId, req.ip);
-      if (await hitRateLimit(db, `api:${userId}`, cfg.rateLimitPerMin)) throw new ApiError(429, 'BUSY', 'rate_limited');
+      if (await hitBurstLimit(db, `apib:${userId}`, cfg.rateLimitPerMin, cfg.rateBurst)) throw new ApiError(429, 'BUSY', 'rate_limited');
 
       if (method === 'POST' && path === '/v1/bootstrap') return ok(await bootstrap(tgUser, json(req), deviceId));
       if (method === 'GET' && path === '/v1/progress') return ok(await features.progress(userId));
-      if (method === 'GET' && path === '/v1/feed') return ok({ feed: await features.feed() });
+      if (method === 'GET' && path === '/v1/feed') return ok(await features.feed());
       if (method === 'GET' && path === '/v1/leaderboard') return ok(await features.leaderboard(userId));
       if (method === 'GET' && path === '/v1/history') return ok({ history: await features.history(userId, url.searchParams.get('game') || '') });
       if (method === 'POST' && (path === '/v1/wheel' || path === '/v1/slots')) {
