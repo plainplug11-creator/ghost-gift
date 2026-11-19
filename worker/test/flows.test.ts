@@ -360,7 +360,7 @@ describe('economy guards on the server', () => {
     const a = makeFlowApp();
     for (const id of ['spark', 'lantern', 'aurora', 'phantom', 'king']) {
       const c = CASES.find((x) => x.id === id)!;
-      expect(c.name.ru && c.name.en && c.name.uk && c.theme).toBeTruthy();
+      expect(c.name.ru && c.name.en && c.theme).toBeTruthy();
     }
     const u = await veteran(a, 20_000);
     for (const c of CASES.filter((x) => x.price > 0 && x.price <= 3500)) {

@@ -1,6 +1,6 @@
 import { nftCollection } from './catalog.ts';
 
-// Bot texts: uk for Ukrainian, ru for other CIS languages / unknown, en for everyone else.
+// Bot texts: English for English-language Telegram clients, Russian for everyone else (incl. Ukrainian).
 const ru = {
   welcome: '👻 <b>Ghost Gift</b> — неоновая осенняя ночь Нью-Йорка и настоящие подарки Telegram.\n\n🎁 Бесплатный кейс каждый день\n🎡 Колесо до ×10 и 🎰 слоты с джекпотом ×40\n🃏 Карта удачи, серия входов и задания с наградами\n💎 Подарки, Premium и NFT приходят прямо в Telegram\n⚖️ Честные шансы — каждый бросок можно проверить\n\nЖми «Играть» 👇',
   play: 'Играть',
@@ -55,36 +55,10 @@ const en: typeof ru = {
   btn_help: '❓ Help',
   btn_share: '📤 Share link',
 };
-const uk: typeof ru = {
-  welcome: '👻 <b>Ghost Gift</b> — неонова осіння ніч Нью-Йорка і справжні подарунки Telegram.\n\n🎁 Безкоштовний кейс щодня\n🎡 Колесо до ×10 і 🎰 слоти з джекпотом ×40\n🃏 Карта удачі, серія входів і завдання з нагородами\n💎 Подарунки, Premium і NFT приходять прямо в Telegram\n⚖️ Чесні шанси — кожен кидок можна перевірити\n\nТисни «Грати» 👇',
-  play: 'Грати',
-  help: '❓ <b>Як це працює</b>\n\n1. Тисни «Грати» — відкриється застосунок.\n2. Поповнюй зірки через Telegram Stars або забирай безкоштовний кейс раз на добу.\n3. Виграні подарунки лежать в інвентарі: продай їх за зірки або виведи в Telegram.\n4. Великі виведення та NFT перевіряє модератор — зазвичай до кількох годин.\n\nКоманди: /me — мій профіль · /ref — запросити друзів\nПитання — пиши прямо сюди.',
-  credited: '⭐ Зараховано <b>{n}</b> зірок. Баланс: <b>{b}</b>.',
-  refunded: '↩️ Платіж повернуто: списано {n} ⭐.',
-  delivered_gift: '🎁 Твій приз «{item}» надіслано! Зазирни в профіль Telegram → Подарунки.',
-  delivered_premium: '👑 Telegram Premium на {m} міс. підключено! Дякуємо, що граєш у Ghost Gift.',
-  delivered_nft: '💎 NFT «{item}» передано тобі! Він уже у твоєму профілі Telegram.',
-  rejected_item: 'Виведення «{item}» відхилено. Предмет повернувся в інвентар — його можна продати або вивести пізніше.',
-  rejected_premium: 'Купівлю Premium скасовано, {n} ⭐ повернулися на баланс.',
-  review: '⏳ Виведення «{item}» на перевірці. Зазвичай це займає до кількох годин.',
-  nft_sending: '💎 NFT «{item}» вже в дорозі! Ми передамо його у твій профіль Telegram — зазвичай протягом кількох годин. Повідомимо, щойно він прийде.',
-  rejected_nft: 'NFT «{item}» не вдалося передати — на баланс зараховано <b>{n}</b> ⭐ (повна вартість).',
-  ref_welcome: '🎉 Бонус друга: +<b>{n}</b> ⭐ до першого поповнення!',
-  ref_bonus: '👥 Твій друг поповнив баланс — тобі <b>+{n}</b> ⭐ реферального бонусу!',
-  streak_reminder: '🔥 Серія <b>{n}</b> дн. згорить опівночі! Забери нагороду дня і безкоштовний кейс 👇',
-  notify_ready: '🔔 Готово! Тепер я зможу нагадати про серію (не частіше ніж раз на день). Вимкнути можна в налаштуваннях гри.',
-  ref_info: '👥 <b>Запрошуй друзів</b>\n\nТвоє посилання:\n{link}\n\nДруг отримає <b>+10%</b> до першого поповнення, а ти — <b>10%</b> від його поповнень протягом перших 30 днів.\n\nДрузів: <b>{f}</b> · зароблено: <b>{e}</b> ⭐',
-  me: '👻 <b>{name}</b>\n⭐ Баланс: <b>{b}</b>\n🏅 Рівень: <b>{lvl}</b> ({xp} XP)\n🔥 Серія: <b>{s}</b> дн.\n🎰 Прокрутів: <b>{o}</b>',
-  invite_text: 'Залітай у Ghost Gift 👻 — неонові кейси зі справжніми подарунками Telegram. За моїм посиланням +10% до першого поповнення!',
-  btn_daily: '🎁 Безкоштовний кейс',
-  btn_wheel: '🎡 Колесо',
-  btn_invite: '👥 Запросити друзів',
-  btn_help: '❓ Допомога',
-  btn_share: '📤 Поділитися посиланням',
-};
 export type TextKey = keyof typeof ru;
+const isEn = (lang: string | null | undefined) => /^en/.test(lang || '');
 export function tx(lang: string | null | undefined, key: TextKey, vars: Record<string, string | number> = {}) {
-  const dict = /^uk/.test(lang || '') ? uk : !lang || /^(ru|be|kk)/.test(lang) ? ru : en;
+  const dict = isEn(lang) ? en : ru;
   const v = { ...vars };
   if (typeof v.item === 'string') v.item = localizeItem(v.item, lang);
   return dict[key].replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? ''));
@@ -93,10 +67,6 @@ export function tx(lang: string | null | undefined, key: TextKey, vars: Record<s
 const ITEM_RU: Record<string, string> = {
   heart: 'Сердце', bear: 'Мишка', rose: 'Роза', gift: 'Подарок', cake: 'Торт', rocket: 'Ракета', cup: 'Кубок', ring: 'Кольцо', diamond: 'Алмаз',
   prem3: 'Premium 3 мес.', prem6: 'Premium 6 мес.', prem12: 'Premium 12 мес.',
-};
-const ITEM_UK: Record<string, string> = {
-  heart: 'Серце', bear: 'Ведмедик', rose: 'Троянда', gift: 'Подарунок', cake: 'Торт', rocket: 'Ракета', cup: 'Кубок', ring: 'Каблучка', diamond: 'Діамант',
-  prem3: 'Premium 3 міс.', prem6: 'Premium 6 міс.', prem12: 'Premium 12 міс.',
 };
 const ITEM_EN: Record<string, string> = {
   heart: 'Heart', bear: 'Teddy Bear', rose: 'Rose', gift: 'Gift', cake: 'Cake', rocket: 'Rocket', cup: 'Trophy', ring: 'Ring', diamond: 'Diamond',
@@ -107,7 +77,7 @@ const RU_KEY = new Map(Object.entries(ITEM_RU).map(([k, v]) => [v, k]));
 export function localizeItem(name: string, lang: string | null | undefined) {
   const k = RU_KEY.get(name);
   if (!k) return name;
-  return /^uk/.test(lang || '') ? ITEM_UK[k] : !lang || /^(ru|be|kk)/.test(lang) ? name : ITEM_EN[k];
+  return isEn(lang) ? ITEM_EN[k] : name;
 }
 export const itemName = (prizeId: string, nftTitle?: string | null) => nftTitle || ITEM_RU[prizeId] || nftCollection(prizeId)?.title || prizeId;
 export const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]!));

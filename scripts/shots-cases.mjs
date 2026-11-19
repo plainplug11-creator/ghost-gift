@@ -74,9 +74,9 @@ await run('profile', async () => {
   const p = await open('?tier=high&tab=profile'); await sleep(1500);
   await p.screenshot({ path: OUT + 'c-profile.png' }); await p.close();
 });
-await run('uk', async () => {
-  const p = await open('?tier=high&lang=uk&push=case:autumn'); await sleep(1500);
-  await p.screenshot({ path: OUT + 'c-uk-detail.png' }); await p.close();
+await run('en', async () => {
+  const p = await open('?tier=high&lang=en&push=case:autumn'); await sleep(1500);
+  await p.screenshot({ path: OUT + 'c-en-detail.png' }); await p.close();
 });
 console.log('errors:', errors.length ? errors : 'none');
 await browser.close();

@@ -437,23 +437,23 @@ const ru = {
 
 export type I18nKey = keyof typeof ru;
 
-export type Lang = 'ru' | 'en' | 'uk';
-/** ru ships in the main bundle; en/uk are separate chunks fetched once before the first render (see loadLang). */
+export type Lang = 'ru' | 'en';
+/** ru ships in the main bundle; en is a separate chunk fetched once before the first render (see loadLang). */
 let dict: Record<I18nKey, string> = ru;
 
 const qs = new URLSearchParams(location.search).get('lang');
 const saved = (() => { try { return localStorage.getItem('gg.lang'); } catch { return null; } })();
 const code = tg.user.language_code ?? '';
-const pickLang = (v: string | null) => (v === 'en' || v === 'ru' || v === 'uk' ? v : null);
+const pickLang = (v: string | null) => (v === 'en' || v === 'ru' ? v : null);
+// Russian by default (Ukrainian and every other non-English locale too), English as the second option
 export const lang: Lang =
-  pickLang(qs) ?? pickLang(saved) ?? (code.startsWith('uk') ? 'uk' : code.startsWith('en') ? 'en' : 'ru');
+  pickLang(qs) ?? pickLang(saved) ?? (code.startsWith('en') ? 'en' : 'ru');
 /** Settings → language: saved locally, applied by a quick reload (all screens re-render in the new language). */
 export function setLang(l: Lang) { try { localStorage.setItem('gg.lang', l); } catch { /* private */ } location.reload(); }
 document.documentElement.lang = lang;
 export async function loadLang() {
   try {
     if (lang === 'en') dict = (await import('./i18n-en')).default;
-    else if (lang === 'uk') dict = (await import('./i18n-uk')).default;
   } catch { /* offline chunk miss → Russian fallback */ }
 }
 
@@ -463,7 +463,7 @@ export function t(key: I18nKey, params?: Record<string, string | number>): strin
   return s;
 }
 
-const nf = new Intl.NumberFormat(lang === 'en' ? 'en-US' : lang === 'uk' ? 'uk-UA' : 'ru-RU');
+const nf = new Intl.NumberFormat(lang === 'en' ? 'en-US' : 'ru-RU');
 export const fmt = (n: number) => nf.format(Math.round(n));
 
 export function greeting(d = new Date()): string {

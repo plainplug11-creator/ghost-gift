@@ -26,7 +26,7 @@ import { loadLang, t } from './core/i18n';
 tg.init({ header: '#04050d', bg: '#04050d', bottom: '#0a0818' });
 initPerf();
 
-// 2. Shell — after the UI language is ready (ru is inline; en/uk are tiny lazy chunks)
+// 2. Shell — after the UI language is ready (ru is inline; en is a tiny lazy chunk)
 void loadLang().then(boot);
 function boot() {
   const root = document.getElementById('app')!;

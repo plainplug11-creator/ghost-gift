@@ -30,7 +30,7 @@ export interface CaseDrop { prize: string; weight: number }
 export interface CaseDef {
   id: string;
   /** display name per language (frontend may override via i18n `case.<id>`) */
-  name: { ru: string; en: string; uk: string };
+  name: { ru: string; en: string };
   /** visual theme key — each case gets its own interface/style in the frontend */
   theme: string;
   price: number; // 0 = daily free case

@@ -224,13 +224,14 @@ describe('inventory, social, referrals', () => {
 
 import { tx as botText } from '../src/texts.ts';
 describe('bot texts', () => {
-  it('uses Ukrainian for uk, Russian for ru/unknown, English otherwise; localizes built-in prize names', () => {
-    expect(botText('uk', 'play')).toBe('Грати');
+  it('English for en clients, Russian for everyone else (uk included); localizes built-in prize names', () => {
+    expect(botText('uk', 'play')).toBe('Играть');
     expect(botText('ru', 'play')).toBe('Играть');
     expect(botText(undefined, 'play')).toBe('Играть');
-    expect(botText('de', 'play')).toBe('Play');
-    expect(botText('uk', 'delivered_gift', { item: 'Роза' })).toContain('«Троянда»');
+    expect(botText('de', 'play')).toBe('Играть');
+    expect(botText('en-US', 'play')).toBe('Play');
+    expect(botText('uk', 'delivered_gift', { item: 'Роза' })).toContain('«Роза»');
     expect(botText('en', 'delivered_gift', { item: 'Роза' })).toContain('“Rose”');
-    expect(botText('uk', 'delivered_nft', { item: 'Plush Pepe #12' })).toContain('Plush Pepe #12');
+    expect(botText('en', 'delivered_nft', { item: 'Plush Pepe #12' })).toContain('Plush Pepe #12');
   });
 });

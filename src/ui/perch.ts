@@ -13,7 +13,7 @@ import { createGhost } from './ghost';
 export type Mood = 'idle' | 'watch' | 'lean' | 'gasp' | 'meh' | 'happy' | 'ecstatic';
 export type Line = 'start' | 'slow' | 'near' | 'common' | 'good' | 'epic';
 
-const LINES: Record<'ru' | 'en' | 'uk', Record<Line, string[]>> = {
+const LINES: Record<'ru' | 'en', Record<Line, string[]>> = {
   ru: {
     start: ['Давай-давай…', 'Чую удачу!', 'Ну-ка, ну-ка…', 'Только не моргай!'],
     slow: ['Стоп… стоп…', 'Ещё чуть-чуть!', 'Тише, тише…'],
@@ -30,14 +30,7 @@ const LINES: Record<'ru' | 'en' | 'uk', Record<Line, string[]>> = {
     good: ['Ooh, nice!', "Now we're talking!", 'Pretty!', "Oh, that one's good!"],
     epic: ['WHOA!', 'I wish I had your luck!', 'DID YOU SEE THAT?!', 'Legendary!'],
   },
-  uk: {
-    start: ['Давай-давай…', 'Чую удачу!', 'Ну-мо, ну-мо…', 'Тільки не кліпай!'],
-    slow: ['Стоп… стоп…', 'Ще трішки!', 'Тихіше, тихіше…'],
-    near: ['Ну майже!', 'Ееей, було ж поруч!', 'Ой! На волосинку!', 'Та ну?!'],
-    common: ['Ну, теж приз', 'Наступного разу точно!', 'Згодиться!', 'Розминка!'],
-    good: ['О, непогано!', 'Оце я розумію!', 'Краса!', 'Так-так, а це непогано!'],
-    epic: ['ОГО!', 'Мені б так щастило!', 'АААА! Ти бачив?!', 'Легенда!'],
-  },
+
 };
 
 const TALK = new URLSearchParams(location.search).has('talk'); // QA: always speak
@@ -163,7 +156,7 @@ export function createPerch(opts: { cls?: string; size?: number; bubble?: boolea
 
   function say(line: Line, chance = 1) {
     if (!bubble || !btext || spoken >= 2 || (!TALK && Math.random() > chance)) return false;
-    const pool = LINES[lang as 'ru' | 'en' | 'uk']?.[line] ?? LINES.ru[line];
+    const pool = LINES[lang as 'ru' | 'en']?.[line] ?? LINES.ru[line];
     btext.textContent = pool[(Math.random() * pool.length) | 0];
     spoken++;
     clearTimeout(bubbleT);

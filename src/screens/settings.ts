@@ -48,7 +48,7 @@ export function createSettings(): Page {
   function askStartBot() { startHint.hidden = false; }
   startHint.addEventListener('click', () => tg.open(`https://t.me/${BOT_USERNAME}?start=notify`));
 
-  const langs: [Lang, string][] = [['ru', 'Русский'], ['uk', 'Українська'], ['en', 'English']];
+  const langs: [Lang, string][] = [['ru', 'Русский'], ['en', 'English']];
   const seg = h('div', { class: 'st-seg', role: 'radiogroup' }, ...langs.map(([l, label]) => {
     const b = h('button', { class: `st-seg-b${l === lang ? ' is-on' : ''}`, 'data-press': '', role: 'radio', 'aria-checked': String(l === lang) }, label);
     b.addEventListener('click', () => { if (l !== lang) { tg.haptic.select(); setLang(l); } });

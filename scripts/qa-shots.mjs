@@ -73,7 +73,7 @@ await run('10b-inv-select', async () => { const p = await open('?tier=high&push=
 await run('13-legal', async () => { const p = await open('?tier=high&push=legal:fair'); await shot(p, '13-fairness'); await p.close(); });
 await run('14-terms', async () => { const p = await open('?tier=high&lang=en&push=legal:terms'); await shot(p, '14-terms-en'); await p.close(); });
 await simple('15-home-low', '?tier=low', 2000);
-await simple('16-home-uk', '?tier=high&lang=uk', 2000);
+await simple('16-home-en', '?tier=high&lang=en', 2000);
 writeFileSync(OUT + 'console-errors.txt', errors.join('\n') || 'none');
 console.log('errors:', errors.length ? errors : 'none');
 await browser.close();
