@@ -88,8 +88,12 @@ p = await open('', 3000);
 for (let i = 0; i < 10; i++) { const f0 = (await apiJson(p, '/v1/feed')).j; if ((f0?.feed || []).length) break; await apiJson(p, '/v1/wheel', 'POST', { bet: 10 }); await sleep(2500); }
 await p.close(); p = await open('', 3000);
 await step('feed', async () => { const fd = (await apiJson(p, '/v1/feed')).j; ok('live feed has our plays', (fd?.feed || []).length > 0, `${fd?.feed?.length} wins, 24h stats ${JSON.stringify(fd?.stats)}`);
-  await sleep(30000); ok('feed live chip (real 24h count) rendered', await p.locator('.chip-live').count() > 0, await p.locator('.chip-live').first().textContent().catch(() => ''));
-  const ago = await p.locator('.feed .chip-item').allTextContents(); ok('feed chips show real age', ago.some((x) => /мин|только что| ч$/.test(x)), ago.filter((x) => /мин|только что| ч$/.test(x)).slice(0, 3).join(' | ')); await shot(p, 'L11-home-after'); });
+  // the marquee loops, so a chip is only in the DOM while it is near the viewport → sample for up to 60 s
+  const AGE = /мин|только что| ч$| ч\b/; let live = '', ages = new Set();
+  for (let i = 0; i < 30 && !(live && ages.size); i++) { await sleep(2000);
+    if (!live && await p.locator('.chip-live').count()) live = await p.locator('.chip-live').first().textContent();
+    for (const x of await p.locator('.feed .chip:not(.is-showcase):not(.chip-live)').allTextContents()) if (AGE.test(x)) ages.add(x); }
+  ok('feed live chip (real 24h count) rendered', !!live, live); ok('feed chips show real age', ages.size > 0, [...ages].slice(0, 3).join(' | ')); await shot(p, 'L11-home-after'); });
 p = await open('?tab=profile', 2500); await shot(p, 'L12-profile'); await p.close();
 
 const bad = apiCalls.filter((c) => !/ 2\d\d$/.test(c));

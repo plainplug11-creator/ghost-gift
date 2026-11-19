@@ -189,6 +189,13 @@ export function createFeed(opts: { demo?: boolean } = {}) {
       for (let i = 0; loop.length < 8; i++) loop.push(showcaseWin(i));
       if (liveChip) loop.unshift(liveChip); // the activity line enters next (poolIdx resets below)
       pool.splice(0, pool.length, ...loop); poolIdx = 0;
+      // first real data while only showcase chips are on screen → swap them in right away (soft fade), not after a full loop
+      if (list.length && nodes.length && nodes.every((n) => n.data.showcase)) {
+        const wasRunning = !!seg; stop();
+        nodes.splice(0).forEach((n) => n.el.remove()); x = 0; fill(); render();
+        track.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 360, easing: 'ease-out' });
+        if (wasRunning) start();
+      }
       for (const f of fresh.reverse()) queue.push(f);
       while (queue.length > 6) queue.shift();
     },
