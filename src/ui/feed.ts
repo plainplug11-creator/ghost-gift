@@ -187,9 +187,8 @@ export function createFeed(opts: { demo?: boolean } = {}) {
     setReal(list: Win[], fresh: Win[] = []) {
       const loop = list.slice(0, 20);
       for (let i = 0; loop.length < 8; i++) loop.push(showcaseWin(i));
-      if (liveChip) loop.splice(Math.min(1, loop.length), 0, liveChip);
+      if (liveChip) loop.unshift(liveChip); // the activity line enters next (poolIdx resets below)
       pool.splice(0, pool.length, ...loop); poolIdx = 0;
-      if (liveChip && !fresh.length) queue.push(liveChip); // let the activity line enter next
       for (const f of fresh.reverse()) queue.push(f);
       while (queue.length > 6) queue.shift();
     },
