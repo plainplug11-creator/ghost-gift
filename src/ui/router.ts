@@ -1,4 +1,4 @@
-import { h } from '../core/dom';
+import { h, hideAfter } from '../core/dom';
 import { reducedMotion } from '../core/perf';
 import { tg } from '../core/telegram';
 
@@ -24,6 +24,7 @@ let current: Tab = 'games';
 let screensEl!: HTMLElement;
 let appEl!: HTMLElement;
 const stack: { page: Page; wrap: HTMLElement }[] = [];
+const unhide = new Map<Element, () => void>();
 
 // ── back-handler stack (BackButton + sheets + pages) ──
 const backs: (() => void)[] = [];
@@ -104,8 +105,9 @@ export const navigate = {
       appEl.parentElement!.append(wrap);
       void wrap.offsetWidth;
       wrap.classList.add('is-open');
-      if (under) { under.wrap.classList.add('is-covered'); under.wrap.inert = true; under.page.onHide?.(); }
-      else { appEl.classList.add('is-covered'); appEl.inert = true; }
+      const coverMs = reducedMotion ? 0 : 640;
+      if (under) { under.wrap.classList.add('is-covered'); under.wrap.inert = true; under.page.onHide?.(); unhide.set(under.wrap, hideAfter(under.wrap, coverMs)); }
+      else { appEl.classList.add('is-covered'); appEl.inert = true; unhide.set(appEl, hideAfter(appEl, coverMs)); }
       stack.push({ page, wrap });
       pushBack(page.backFn = () => navigate.back());
       page.onShow?.();
@@ -122,6 +124,8 @@ export const navigate = {
     const s = top.wrap;
     s.classList.remove('is-open');
     const under = stack[stack.length - 1];
+    const showEl = under ? under.wrap : appEl;
+    unhide.get(showEl)?.(); unhide.delete(showEl);
     if (under) { under.wrap.classList.remove('is-covered'); under.wrap.inert = false; under.page.onShow?.(); }
     else { appEl.classList.remove('is-covered'); appEl.inert = false; }
     emit();

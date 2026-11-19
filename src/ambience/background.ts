@@ -42,9 +42,10 @@ export function mountBackground(root: HTMLElement) {
   let retried = file === h264;
   v.addEventListener('error', () => {
     if (!retried) { retried = true; v.src = media(h264); play(); return; }
-    v.remove();
+    v.remove(); root.classList.remove('has-video');
   });
-  v.addEventListener('playing', () => v.classList.add('is-ready'), { once: true });
+  // once the video has faded in, the poster under it is pure overdraw (one full-screen quad less every frame)
+  v.addEventListener('playing', () => { v.classList.add('is-ready'); setTimeout(() => v.isConnected && root.classList.add('has-video'), 1500); }, { once: true });
   root.querySelector('.bg-scrim')!.before(v);
 
   const play = () => { if (isRunning() && !inFocus()) v.play().catch(() => { /* autoplay blocked → poster stays */ }); };

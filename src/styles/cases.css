@@ -131,7 +131,7 @@
   background: linear-gradient(180deg, rgba(var(--rc), 0.2), rgba(14, 16, 46, 0.72) 72%);
   border: 1px solid rgba(var(--rc), 0.36);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 0 0 1px rgba(255, 255, 255, 0.03), 0 10px 24px -12px rgba(0, 0, 12, 0.8);
-  backface-visibility: hidden; transform-origin: 50% 55%;
+  transform-origin: 50% 55%; /* no backface-visibility: it promoted every tile part to its own layer (300 → 120 layers) */
 }
 .op-sharp .tile { overflow: hidden; }
 .tile .pi { --pi: calc(var(--tile) * 0.7); position: relative; z-index: 1; filter: drop-shadow(0 6px 10px rgba(0, 0, 12, 0.55)); }
@@ -145,9 +145,11 @@
 .tile-v { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 3px; margin-bottom: 8px; font-size: 13.5px; font-weight: 800; color: var(--text-1, #fff); font-variant-numeric: tabular-nums; text-shadow: 0 1px 6px rgba(0, 0, 12, 0.7); }
 .tile-v .star-ico { width: 15px; height: 15px; }
 /* glass shine sweep when a cell crosses the needle */
-.op-sharp .tile::after { content: ""; position: absolute; top: -20%; bottom: -20%; left: -60%; width: 45%; z-index: 2; pointer-events: none; opacity: 0;
+/* glass shine sweep when a cell crosses the needle: ONE element in the fixed lens (not one per tile — per-tile
+   animations inside the moving strip forced every later tile onto its own layer) */
+.ln-shine-w { inset: 0; border-radius: 24px; overflow: hidden; }
+.ln-shine-w > i { position: absolute; top: -20%; bottom: -20%; left: -60%; width: 45%; opacity: 0;
   background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.32) 50%, transparent); transform: translateX(0) skewX(-12deg); }
-.op-sharp .tile.is-hit::after { animation: tile-shine 0.55s ease-out 1; }
 @keyframes tile-shine { 0% { opacity: 1; transform: translateX(0) skewX(-12deg); } 100% { opacity: 0; transform: translateX(380%) skewX(-12deg); } }
 .op.is-settled .tile { transition: opacity 0.45s ease, transform 0.6s var(--spring-bouncy), box-shadow 0.4s ease; }
 .op.is-settled .tile:not(.is-win):not(.is-near) { opacity: 0.28; }
@@ -206,7 +208,7 @@
 .op-near { position: absolute; top: calc(50% - var(--tile) * 0.56 - 50px); transform: translateX(-50%) scale(0.6); opacity: 0; padding: 4px 10px; border-radius: 10px; font-size: 12px; font-weight: 800; white-space: nowrap; color: #fff; background: linear-gradient(135deg, #ff5ccc, #a65cff); box-shadow: 0 6px 18px -4px rgba(255, 79, 200, 0.7); transition: opacity 0.3s ease, transform 0.5s var(--spring-bouncy); z-index: 4; }
 .op.is-nearmiss .op-near { opacity: 1; transform: translateX(-50%) scale(1); }
 /* low tier: no glow pools / shine */
-.op.tier-low .tile-glow, .op.tier-low .op-sharp .tile::after { display: none; }
+.op.tier-low .tile-glow, .op.tier-low .ln-shine-w { display: none; }
 
 /* reveal */
 .op-reveal { inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.2s ease; }
@@ -266,7 +268,8 @@
 .op.r-common .op-card-r { color: var(--text-2); filter: none; }
 .op-reveal.is-out { opacity: 0; transition: opacity 0.25s ease; }
 
-.op-confetti { inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.op-confetti { inset: 0; width: 100%; height: 100%; pointer-events: none; display: none; } /* an idle full-screen canvas is still a composited quad */
+.op-confetti.is-on { display: block; }
 .op-demo { left: 50%; top: calc(var(--safe-top) + 14px); transform: translateX(-50%); padding: 5px 12px; border-radius: 12px; font-size: 11.5px; font-weight: 850; letter-spacing: 0.08em; color: #d9fbff; background: rgba(63, 227, 255, 0.14); border: 1px solid rgba(63, 227, 255, 0.4); white-space: nowrap; }
 .op-skip { left: 50%; bottom: calc(var(--safe-bottom) + 26px); transform: translateX(-50%); height: 40px; padding: 0 20px; border-radius: 20px; font-size: 14px; font-weight: 700; color: var(--text-2);
   background: rgba(20, 22, 60, 0.55); border: 1px solid var(--glass-border); transition: opacity 0.25s ease; }
@@ -528,3 +531,10 @@ html:not([data-tier="low"]) .bs.rs.is-open .rs-n { animation: name-shimmer 3s ea
 .inv-bar-sell { height: 44px; padding: 0 20px; border-radius: 14px; font-weight: 800; }
 .pg-inv .pg-scroll { padding-bottom: calc(var(--safe-bottom) + 90px); }
 .inv-sell-ok { white-space: nowrap; font-size: 15px; padding-inline: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 2px; }
+/* while the reel moves, prize-icon idle loops inside the strip are frozen: a running transform animation
+   inside the moving strip makes every later tile its own compositor layer (~200 layers → 1). They resume on landing. */
+.op:not(.is-settled) .op-row *, .op:not(.is-settled) .op-row *::before, .op:not(.is-settled) .op-row *::after { animation: none !important; }
+/* the reveal layer does nothing until the reveal: no hidden loops ticking (iris text is a background-position
+   animation = style+paint every frame) and no layers while the reel runs */
+.op:not(.is-reveal) .op-reveal { visibility: hidden; }
+.op:not(.is-reveal) .op-reveal *, .op:not(.is-reveal) .op-reveal *::before, .op:not(.is-reveal) .op-reveal *::after { animation: none !important; }

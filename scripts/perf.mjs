@@ -54,11 +54,12 @@ for (let i = 0; i < RUNS; i++) {
   const nav = await s.p.evaluate(() => { const n = performance.getEntriesByType('navigation')[0]; const fcp = performance.getEntriesByName('first-contentful-paint')[0]; return { dcl: Math.round(n.domContentLoadedEventEnd), load: Math.round(n.loadEventEnd), fcp: Math.round(fcp?.startTime || 0), lcp: Math.round(window.__lcp) }; });
   out.load.push({ ...nav, loadWall });
   if (i === 0) out.weight = { totalKB: Math.round(s.bytes.total / 1024), byTypeKB: Object.fromEntries(Object.entries(s.bytes.byType).map(([k, v]) => [k, Math.round(v / 1024)])) };
+  const ONLY = process.env.ONLY;
   // frames: idle home (CPU 4x)
-  out.idleHome.push(await frames(s.p, 3000, null, s.cdp));
+  if (!ONLY) out.idleHome.push(await frames(s.p, 3000, null, s.cdp));
   // scroll case page
-  await s.p.goto(BASE + '?tier=high&push=case:ghost', { waitUntil: 'load' }); await s.p.waitForTimeout(2500);
-  out.scrollCase.push(await frames(s.p, 0, async () => {
+  if (!ONLY) { await s.p.goto(BASE + '?tier=high&push=case:ghost', { waitUntil: 'load' }); await s.p.waitForTimeout(2500); }
+  if (!ONLY) out.scrollCase.push(await frames(s.p, 0, async () => {
     for (let k = 0; k < 2; k++) {
       await s.p.evaluate(async () => { const sc = document.querySelector('.pg-scroll') || document.scrollingElement; const H = sc.scrollHeight; for (let y = 0; y < Math.min(H, 1400); y += 22) { sc.scrollTop = y; await new Promise((r) => requestAnimationFrame(r)); } for (let y = Math.min(H, 1400); y > 0; y -= 22) { sc.scrollTop = y; await new Promise((r) => requestAnimationFrame(r)); } });
     }
@@ -68,7 +69,7 @@ for (let i = 0; i < RUNS; i++) {
   await s.p.waitForSelector('.op.is-reel', { timeout: 20000 });
   out.spin.push(await frames(s.p, 4000, null, s.cdp));
   // wheel / slots spins (only builds that have the games)
-  for (const g of ['wheel', 'slots']) {
+  for (const g of ONLY ? [] : ['wheel', 'slots']) {
     try {
       await s.p.goto(BASE + `?tier=high&push=${g}`, { waitUntil: 'load' });
       await s.p.waitForSelector('.gk-go', { timeout: 8000 }); await s.p.waitForTimeout(1500);

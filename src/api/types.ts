@@ -99,6 +99,7 @@ export interface SpinResult {
   index?: number; faces?: SlotSym[]; balance: number; fairness: Fairness;
   progress?: LevelDelta; unlocked?: AchId[];
 }
+export interface FeedStats { plays24h: number; players24h: number; best24h: number }
 export interface FeedItem { id: number; game: string; prizeId: string; payout: number; rarity: Rarity; at: number; mult: number; name: string | null }
 export interface LeaderRow { rank: number; name: string | null; level: number; score: number; me?: boolean }
 export interface Leaderboard { week: string; top: LeaderRow[]; me: { rank: number; score: number; level: number } }

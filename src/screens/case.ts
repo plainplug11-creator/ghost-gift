@@ -1,6 +1,6 @@
 import '../styles/prizes.css';
 import '../styles/cases.css';
-import { h, html, starIcon } from '../core/dom';
+import { h, hideAfter, html, starIcon } from '../core/dom';
 import { fmt, t, type I18nKey } from '../core/i18n';
 import { store } from '../core/store';
 import { tg } from '../core/telegram';
@@ -139,7 +139,9 @@ export function createCase(id: string): Page {
     opening = createOpening(c, res);
     el.append(opening.el);
     el.classList.add('is-opening');
+    const showUnder = [...el.children].filter((c) => c !== opening!.el).map((c) => hideAfter(c, 450));
     await opening.run();
+    showUnder.forEach((f) => f());
     if (!demo) {
       api.commit();
       if (RARITY_RANK[res.prize.rarity] >= 1) store.lastWin.set({ ...res.prize });

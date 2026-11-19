@@ -40,11 +40,11 @@ const JELLY = new Set<string>(['bear', 'heart', 'rose', 'cake', 'gift', 'leaf', 
 /** Server feed row → marquee chip. Hidden players show as an anonymous ghost. */
 function toWin(f: FeedItem): Win {
   const nick = f.name || t('feed.anon');
-  if (f.game === 'wheel' || f.game === 'slots') return { id: f.id, nick, item: 'item.stars', stars: f.payout, rarity: f.rarity, note: `×${f.mult} ${t(f.game === 'wheel' ? 'feed.wheel' : 'feed.slots')}` };
+  if (f.game === 'wheel' || f.game === 'slots') return { id: f.id, at: f.at, nick, item: 'item.stars', stars: f.payout, rarity: f.rarity, note: `×${f.mult} ${t(f.game === 'wheel' ? 'feed.wheel' : 'feed.slots')}` };
   const p = PRIZES[f.prizeId];
-  if (!p || p.kind === 'stars') return { id: f.id, nick, item: 'item.stars', stars: f.payout || p?.value, rarity: f.rarity };
+  if (!p || p.kind === 'stars') return { id: f.id, at: f.at, nick, item: 'item.stars', stars: f.payout || p?.value, rarity: f.rarity };
   const item = (p.kind === 'premium' ? (p.months === 6 ? 'item.premium6' : 'item.premium') : `item.${p.id}`) as I18nKey;
-  return { id: f.id, nick, item, icon: (JELLY.has(p.icon) ? p.icon : 'diamond') as JellyIcon, rarity: f.rarity };
+  return { id: f.id, at: f.at, nick, item, icon: (JELLY.has(p.icon) ? p.icon : 'diamond') as JellyIcon, rarity: f.rarity };
 }
 
 function dailyStatus() {
@@ -171,15 +171,17 @@ export function createHome() {
     clearTimeout(feedTimer);
     if (demoFeed) return;
     try {
-      const list = await api.feed();
-      if (list) {
+      const r = await api.feed();
+      if (r) {
+        const list = r.items;
         const wins = list.map(toWin);
         const fresh = lastId ? wins.filter((w) => (w.id ?? 0) > lastId) : [];
+        if (r.stats) feed.setStats(r.stats.plays24h, r.stats.players24h);
         if (!lastId) feed.setReal(wins); else if (fresh.length) feed.setReal(wins, fresh);
-        lastId = Math.max(lastId, ...list.map((x) => x.id));
+        lastId = Math.max(lastId, 0, ...list.map((x) => x.id));
       }
     } catch { /* offline: keep what we have */ }
-    if (feedOn) feedTimer = window.setTimeout(pullFeed, isRunning() ? 20_000 : 60_000);
+    if (feedOn) feedTimer = window.setTimeout(pullFeed, isRunning() ? 15_000 : 60_000);
   };
 
   const scroll = h('div', { class: 'screen-scroll' }, hero, progressStrip(), grid, luck, tiles());

@@ -15,7 +15,7 @@ import { isRunning, onRunningChange, reducedMotion } from '../core/perf';
  */
 
 type Rarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
-export interface Win { nick: string; item: I18nKey; icon?: JellyIcon; stars?: number; rarity: Rarity; me?: boolean; id?: number; showcase?: boolean; note?: string }
+export interface Win { nick: string; item: I18nKey; icon?: JellyIcon; stars?: number; rarity: Rarity; me?: boolean; id?: number; showcase?: boolean; note?: string; at?: number; live?: string }
 
 const NICKS = ['lera_mur', 'Дима', 'kostya.ua', 'Настя', 'maks_k', 'Оля', 'sasha', 'vlad_off', 'Kate', 'Артём', 'yulia.b', 'Ира', 'den4ik', 'Mira', 'Тимур', 'nikita07', 'Ann', 'Богдан'];
 const ITEMS: { item: I18nKey; icon?: JellyIcon; stars?: number[]; rarity: Rarity; w: number }[] = [
@@ -48,14 +48,28 @@ export function mockWin(): Win {
   return { nick: pick(NICKS), item: it.item, icon: it.icon, stars: it.stars && pick(it.stars), rarity: it.rarity };
 }
 
+/** "5 мин" / "2 ч" — real age of a server win, computed when the chip enters (no fake timestamps). */
+function ago(at: number) {
+  const m = Math.max(0, Math.round((Date.now() - at) / 60_000));
+  if (m < 1) return t('feed.now');
+  if (m < 60) return t('feed.agoM', { n: m });
+  const hh = Math.round(m / 60);
+  return hh < 24 ? t('feed.agoH', { n: hh }) : t('feed.agoD', { n: Math.round(hh / 24) });
+}
+
 function chip(w: Win, isNew = false) {
+  if (w.live) {
+    const el = h('div', { class: 'chip chip-live' });
+    el.append(html('<span class="chip-ico"><i class="live-dot"></i></span>'), h('span', { class: 'chip-text' }, h('span', { class: 'chip-nick' }, t('feed.live')), h('span', { class: 'chip-item' }, w.live)));
+    return el;
+  }
   const ico = w.stars ? starIcon('star-ico') : ji(w.icon!);
   const label = w.stars ? t('item.stars', { n: fmt(w.stars) }) : t(w.item);
   const el = h('div', { class: `chip r-${w.rarity}${isNew ? ' is-new' : ''}${w.me ? ' is-me' : ''}${w.showcase ? ' is-showcase' : ''}` });
   // epic+ chips get a moving shine sweep (desynced per chip)
   if (w.rarity !== 'common' && w.rarity !== 'rare') el.style.setProperty('--sd', `${(Math.random() * 3).toFixed(2)}s`);
   el.append(html(`<span class="chip-ico">${ico}</span>`));
-  const text = h('span', { class: 'chip-text' }, h('span', { class: 'chip-nick' }, w.nick), h('span', { class: 'chip-item' }, w.note ? `${label} · ${w.note}` : label));
+  const text = h('span', { class: 'chip-text' }, h('span', { class: 'chip-nick' }, w.nick), h('span', { class: 'chip-item' }, [label, w.note, w.at ? ago(w.at) : ''].filter(Boolean).join(' · ')));
   el.append(text);
   return el;
 }
@@ -74,6 +88,7 @@ export function createFeed(opts: { demo?: boolean } = {}) {
   const history: Win[] = [];          // chips that scrolled off the left (for drag-back)
   const queue: Win[] = [];            // fresh wins waiting to enter
   // seamless loop source: demo generator locally, honest prize showcase in production until real wins arrive
+  let liveChip: Win | null = null;
   const pool: Win[] = demo ? Array.from({ length: 14 }, mockWin) : Array.from({ length: 10 }, (_, i) => showcaseWin(i));
   let poolIdx = 0;
 
@@ -172,9 +187,14 @@ export function createFeed(opts: { demo?: boolean } = {}) {
     setReal(list: Win[], fresh: Win[] = []) {
       const loop = list.slice(0, 20);
       for (let i = 0; loop.length < 8; i++) loop.push(showcaseWin(i));
+      if (liveChip) loop.splice(Math.min(3, loop.length), 0, liveChip);
       pool.splice(0, pool.length, ...loop); poolIdx = 0;
       for (const f of fresh.reverse()) queue.push(f);
       while (queue.length > 6) queue.shift();
+    },
+    /** Real 24h activity → one honest "live" chip in the loop (only once there is something to say). */
+    setStats(plays: number, players: number) {
+      liveChip = plays >= 3 ? { nick: '', item: 'feed.live', rarity: 'common', live: t('feed.liveStat', { n: fmt(plays), p: fmt(players) }) } : null;
     },
     destroy() { stop(); clearTimeout(timer); clearTimeout(resumeT); ro.disconnect(); },
   };

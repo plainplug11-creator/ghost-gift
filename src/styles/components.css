@@ -265,3 +265,10 @@ html:not(.reduce-motion) .skel > i { animation: skel 1.3s ease-in-out infinite; 
   padding: 8px 14px; border-radius: 999px; font-size: 13px; font-weight: 700; color: #fff; background: rgba(60, 20, 70, 0.92); border: 1px solid rgba(255, 79, 200, 0.5); box-shadow: 0 8px 20px -8px rgba(0, 0, 0, 0.8); pointer-events: none; white-space: nowrap; }
 .net-off.is-on { transform: translate(-50%, 0); opacity: 1; }
 .net-off.is-back { background: rgba(14, 60, 80, 0.92); border-color: rgba(63, 227, 255, 0.55); }
+
+/* honest "live" activity chip (real 24h counts) */
+.chip-live { border-color: rgba(70, 230, 255, 0.45); background: linear-gradient(135deg, rgba(20, 60, 90, 0.75), rgba(40, 20, 80, 0.75)); }
+.chip-live .chip-nick { color: #7ff3ff; }
+.live-dot { display: block; width: 10px; height: 10px; margin: auto; border-radius: 50%; background: #46e6ff; box-shadow: 0 0 10px #46e6ff; animation: live-pulse 1.6s ease-in-out infinite; }
+@keyframes live-pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.6); opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }

@@ -1,6 +1,6 @@
 import type { GameApi } from './index';
 import { ApiError } from './types';
-import type { CaseDrop, Fairness, FeedItem, InvItem, Leaderboard, OpenResult, ProgressInfo, SpinResult } from './types';
+import type { CaseDrop, Fairness, FeedItem, FeedStats, InvItem, Leaderboard, OpenResult, ProgressInfo, SpinResult } from './types';
 import { applyProgress, flushCelebrations, patchProgress, setProgress } from '../core/progress';
 import { CASES } from './catalog';
 import { store } from '../core/store';
@@ -191,7 +191,8 @@ export const httpApi: GameApi = {
     return r;
   },
   async feed() {
-    return (await req<{ feed: FeedItem[] }>('/v1/feed')).feed;
+    const r = await req<{ feed: FeedItem[]; stats?: FeedStats }>('/v1/feed');
+    return { items: r.feed, stats: r.stats };
   },
   async leaderboard() {
     return req<Leaderboard>('/v1/leaderboard');

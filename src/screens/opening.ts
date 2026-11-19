@@ -27,6 +27,7 @@ const N = 58;              // tiles in the strip
 const WIN = 50;            // winner index
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+const SHINE_KF: Keyframe[] = [{ opacity: 1, transform: 'translateX(0) skewX(-12deg)' }, { opacity: 0, transform: 'translateX(380%) skewX(-12deg)' }];
 const anim = (el: Element, kf: Keyframe[], o: KeyframeAnimationOptions) => el.animate(kf, { fill: 'both', ...o });
 
 function weightedPick(c: CaseDef) {
@@ -149,7 +150,7 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
         ${tier === 'low' ? '' : `<div class="op-row op-blur" aria-hidden="true">${items.map((p) => tileHtml(p, true)).join('')}</div>`}
       </div>${fx ? `<div class="op-streaks" aria-hidden="true">${Array.from({ length: 7 }, (_, i) => `<i style="--i:${i}"></i>`).join('')}</div>` : ''}</div>
       ${fx ? `<div class="op-shock"><i></i><i></i><i></i></div><div class="op-sparks">${Array.from({ length: 20 }, () => '<i></i>').join('')}</div>` : ''}
-      <div class="op-lens"><i class="ln-pulse"></i><i class="ln-glow"></i><i class="ln-c tl"></i><i class="ln-c tr"></i><i class="ln-c bl"></i><i class="ln-c br"></i><i class="ln-chev up"></i><i class="ln-chev dn"></i><i class="ln-hair"></i></div>
+      <div class="op-lens"><span class="ln-shine-w"><i class="ln-shine"></i></span><i class="ln-pulse"></i><i class="ln-glow"></i><i class="ln-c tl"></i><i class="ln-c tr"></i><i class="ln-c bl"></i><i class="ln-c br"></i><i class="ln-chev up"></i><i class="ln-chev dn"></i><i class="ln-hair"></i></div>
       <div class="op-near">${t('case.nearMiss')}</div>
     </div>
     ${deckHtml(c, best)}
@@ -180,7 +181,7 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
   const rays = $('.op-rays'), flash = $('.op-flash'), reel = $('.op-reel'), win = $('.op-win'), strip = $('.op-strip');
   const sharp = $('.op-sharp'), blur = el.querySelector<HTMLElement>('.op-blur'), lens = $('.op-lens'), near = $('.op-near');
   const tint = $('.op-tint'), land = $('.op-land'), squeeze = $('.op-squeeze');
-  const streaks = el.querySelector<HTMLElement>('.op-streaks'), lpulse = $('.ln-pulse'), deck = el.querySelector<HTMLElement>('.op-deck');
+  const streaks = el.querySelector<HTMLElement>('.op-streaks'), lpulse = $('.ln-pulse'), shine = $('.ln-shine'), deck = el.querySelector<HTMLElement>('.op-deck');
   let focused = false;
   const focus = (on: boolean) => { if (focused !== on) { focused = on; setFocus(on); } };
   /** short decaying camera shake (transform only, compositor) */
@@ -288,49 +289,66 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
       const D = reducedMotion ? 1400 : epicMoment ? 6400 : 5200;
       const k = epicMoment ? 3.3 : 3; // ease-out power: lower = livelier tail (no dead crawl)
       let t0 = performance.now(), from = x0, dist = target - over - x0, dur = D, mode: 'main' | 'fast' | 'settle' = 'main';
-      let x = x0, lastIdx = -1, lastTick = 0, lastBlur = -1, lastTint = -1, raf = 0, riserOn = false;
+      let x = x0, lastIdx = -1, lastTick = 0, raf = 0, riserOn = false;
       const settleFrom = { x: 0, t: 0 };
       const touched = new Set<number>();
 
-      const setBlur = (v: number) => {
-        if (!blur) return;
-        const b = Math.min(1, Math.abs(v) / 2600);
-        if (Math.abs(b - lastBlur) < 0.03 && b !== 0) return;
-        lastBlur = b;
-        sharp.style.opacity = String(1 - b * 0.7);
-        blur.style.opacity = String(b);
-        if (streaks) streaks.style.opacity = (b * 0.9).toFixed(2);
+      // Visual state as pure functions of reel speed → baked into compositor keyframes (no per-frame style writes).
+      const blurOf = (v: number) => Math.min(1, Math.abs(v) / 2600);
+      const tintOf = (v: number) => 0.25 + Math.min(1, Math.abs(v) / 3000) * 0.65;
+      const anims: Animation[] = [];
+      const clearAnims = () => { anims.forEach((a) => a.cancel()); anims.length = 0; };
+      /**
+       * Bake one ease-out segment (x = from + dist·(1-(1-p)^kk)) into sampled WAAPI keyframes: the strip moves on the
+       * compositor even if the main thread is busy; blur / streak / tint opacities follow the same timeline.
+       */
+      const bake = (kk: number, ms: number) => {
+        clearAnims();
+        const N = 48, sx: Keyframe[] = [], so: Keyframe[] = [], sb: Keyframe[] = [], ss: Keyframe[] = [], st: Keyframe[] = [];
+        for (let i = 0; i <= N; i++) {
+          const q = i / N, off = 1 - Math.pow(1 - q, 1.6); // denser samples early, where the strip moves fastest
+          const e = 1 - Math.pow(1 - off, kk), v = (kk * Math.pow(1 - off, kk - 1) * dist) / (ms / 1000);
+          sx.push({ offset: off, transform: `translate3d(${(from + dist * e).toFixed(1)}px,0,0)` });
+          const b = blur ? blurOf(v) : 0;
+          so.push({ offset: off, opacity: 1 - b * 0.7 }); sb.push({ offset: off, opacity: b }); ss.push({ offset: off, opacity: b * 0.9 });
+          st.push({ offset: off, opacity: tintOf(v) });
+        }
+        const o: KeyframeAnimationOptions = { duration: ms, easing: 'linear', fill: 'forwards' };
+        anims.push(strip.animate(sx, o));
+        if (blur) { anims.push(sharp.animate(so, o), blur.animate(sb, o)); if (streaks) anims.push(streaks.animate(ss, o)); }
+        if (rich) anims.push(tint.animate(st, o));
       };
-      // background reaction: case-tinted glow breathes with speed (never hints the rarity)
-      const setTint = (v: number) => {
-        if (!rich) return;
-        const o = 0.25 + Math.min(1, Math.abs(v) / 3000) * 0.65;
-        if (Math.abs(o - lastTint) < 0.04) return;
-        lastTint = o; tint.style.opacity = o.toFixed(2);
+      const commitX = (xx: number) => {
+        strip.style.transform = `translate3d(${xx.toFixed(1)}px,0,0)`;
+        sharp.style.opacity = ''; if (blur) blur.style.opacity = '0'; if (streaks) streaks.style.opacity = '0';
+        if (rich) tint.style.opacity = tintOf(0).toFixed(2);
+        clearAnims();
       };
-      // classic flat strip; only the rarity glow under each cell brightens near the lens (opacity only)
-      const depth = () => {
-        if (!rich) return;
+      // classic flat strip; only the rarity glow under each cell brightens near the lens.
+      // Updated only when the reel is slow enough to read (when fast, the motion-blur row covers it anyway).
+      const depth = (v: number) => {
+        if (!rich || Math.abs(v) > 1400) return;
         const c = (cx - x - TILE / 2) / STEP;
         const lo = Math.max(0, Math.floor(c) - 2), hi = Math.min(N - 1, Math.ceil(c) + 2);
         touched.forEach((i) => { if (i < lo || i > hi) { glows[i].style.opacity = ''; touched.delete(i); } });
         for (let i = lo; i <= hi; i++) { glows[i].style.opacity = Math.max(0.25, 1 - Math.abs(i - c) * 1.1).toFixed(2); touched.add(i); }
       };
-      let lastBeat = 0;
+      let lastBeat = 0, shineA: Animation | null = null;
       const tick = (now: number, v: number, prog: number) => {
         const idx = Math.floor((cx - x + GAP / 2) / STEP);
         if (idx === lastIdx) return;
         lastIdx = idx;
-        if (rich && tiles[idx]) tiles[idx].classList.add('is-hit');
         if (now - lastTick < 50) return; // cap haptics/needle at ~20/s
         lastTick = now;
         const sp = Math.min(1, Math.abs(v) / 2800);
+        if (rich) { shineA?.cancel(); shineA = shine.animate(SHINE_KF, { duration: 550, easing: 'ease-out' }); }
         sfx.tick(sp, prog);
         perch.flick(sp);
         // the lens "breathes" on every cell once the reel is slow enough to follow by eye
         if (fx && sp < 0.6) lpulse.animate([{ opacity: 0.9 - sp, transform: 'scale(1.06)' }, { opacity: 0, transform: 'scale(1)' }], { duration: 220, easing: 'ease-out' });
         tg.haptic.select();
       };
+      // the rAF loop only does bookkeeping (needle ticks, sound, heartbeat) from the same analytic curve — no layout reads
       const frame = (now: number) => {
         let p: number, v = 0;
         if (mode === 'settle') {
@@ -356,28 +374,32 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
             }
           }
         }
-        strip.style.transform = `translate3d(${x.toFixed(1)}px,0,0)`;
-        depth();
-        setBlur(v);
-        setTint(v);
+        depth(v);
         tick(now, v, mode === 'settle' ? 1 : p);
         if (p < 1) { raf = requestAnimationFrame(frame); return; }
-        if (mode !== 'settle' && over) { mode = 'settle'; settleFrom.x = x; settleFrom.t = now; raf = requestAnimationFrame(frame); return; }
-        setBlur(0); setTint(0);
+        if (mode !== 'settle' && over) {
+          mode = 'settle'; settleFrom.x = x; settleFrom.t = now;
+          commitX(x);
+          anims.push(strip.animate([{ transform: `translate3d(${x.toFixed(1)}px,0,0)` }, { transform: `translate3d(${target.toFixed(1)}px,0,0)` }], { duration: 620, easing: 'cubic-bezier(.33,1,.68,1)', fill: 'forwards' }));
+          raf = requestAnimationFrame(frame); return;
+        }
+        commitX(target);
         resolve();
       };
       reelSkip = () => {
         if (mode === 'settle') return;
         stopRiser();
         from = x; dist = target - over - x; t0 = performance.now(); dur = 420; mode = 'fast';
+        bake(3, dur);
       };
       strip.style.transform = `translate3d(${x0}px,0,0)`;
       el.classList.add('is-reel');
-      depth();
+      x = x0; depth(0);
       anim(reel, [{ opacity: 0, transform: 'translateY(26px) scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: skipped ? 200 : 420, easing: 'cubic-bezier(.22,1,.36,1)' });
       if (!skipped) { sfx.whoosh(); perch.gust(); spoke = perch.say('start', 0.35); }
       perch.setMood('watch'); aim(cx + win.getBoundingClientRect().left - el.getBoundingClientRect().left, win.getBoundingClientRect().top - el.getBoundingClientRect().top + win.clientHeight / 2);
-      if (skipped) reelSkip();
+      if (skipped) reelSkip(); else bake(k, dur);
+      t0 = performance.now();
       raf = requestAnimationFrame(frame);
       void raf;
     });
@@ -463,6 +485,7 @@ export function createOpening(c: CaseDef, res: OpenResult): Opening {
     if (!reducedMotion) {
       const palette = ['#3fe3ff', '#9d6bff', '#ff4fc8', '#ffffff', `rgb(${rgb})`];
       if (rank >= 3) palette.push('#ffd66e', '#fff1b8');
+      canvas.classList.add('is-on');
       stopConfetti = confetti(canvas, { colors: palette, count: [50, 70, 100, 150, 190][rank], power: 0.8 + rank * 0.12, y: 0.34 });
     }
     await sleep(epicMoment ? 1000 : 650);

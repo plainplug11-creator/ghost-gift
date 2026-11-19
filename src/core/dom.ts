@@ -33,3 +33,12 @@ export const starIcon = (cls = 'star-ico') =>
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 /** Plain text where "⭐" becomes the ghost-star currency icon. */
 export const starText = (s: string) => html(esc(s).replace(/\s?⭐/g, starIcon('star-ico star-inline')));
+
+/**
+ * Fully hide an element once its fade-out transition is over (visibility:hidden drops its layers from
+ * compositing — covered screens cost nothing). Returns a function that shows it again immediately.
+ */
+export function hideAfter(el: Element, ms: number): () => void {
+  const t = window.setTimeout(() => el.classList.add('is-gone'), ms);
+  return () => { clearTimeout(t); el.classList.remove('is-gone'); };
+}
