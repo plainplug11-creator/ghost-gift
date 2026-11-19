@@ -166,7 +166,7 @@ export function createHome() {
   renderLuck();
 
   // Real wins from the server (production). Locally the demo generator runs instead.
-  let lastId = 0, feedTimer = 0, feedOn = true;
+  let lastId = 0, feedTimer = 0, feedOn = true, inited = false, lastSig = '';
   const pullFeed = async () => {
     clearTimeout(feedTimer);
     if (demoFeed) return;
@@ -176,8 +176,12 @@ export function createHome() {
         const list = r.items;
         const wins = list.map(toWin);
         const fresh = lastId ? wins.filter((w) => (w.id ?? 0) > lastId) : [];
-        if (r.stats) feed.setStats(r.stats.plays24h, r.stats.players24h);
-        if (!lastId) feed.setReal(wins); else if (fresh.length) feed.setReal(wins, fresh);
+        const sig = r.stats ? `${r.stats.plays24h}/${r.stats.players24h}` : '';
+        const statsChanged = sig !== lastSig; lastSig = sig;
+        if (r.stats && statsChanged) feed.setStats(r.stats.plays24h, r.stats.players24h);
+        // rebuild the loop only when something actually changed (keeps the marquee order stable between polls)
+        if (!inited || fresh.length || statsChanged) feed.setReal(wins, fresh);
+        inited = true;
         lastId = Math.max(lastId, 0, ...list.map((x) => x.id));
       }
     } catch { /* offline: keep what we have */ }

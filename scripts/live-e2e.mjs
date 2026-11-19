@@ -32,7 +32,7 @@ async function open(q = '', wait = 2500) {
 }
 const shot = (p, n) => p.screenshot({ path: OUT + n + '.png' });
 const bal = (p) => p.evaluate(() => { const e = document.querySelector('.bal-v, .balance-v, [data-balance], .hd-bal'); return e ? e.textContent : null; });
-const apiJson = (p, path, method = 'GET', body) => p.evaluate(async ([u, m, b]) => { const r = await fetch(u, { method: m, headers: { Authorization: 'tma ' + window.Telegram.WebApp.initData, 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined }); return { s: r.status, j: await r.json().catch(() => null) }; }, [API + path, method, body]);
+const apiJson = (p, path, method = 'GET', body) => p.evaluate(async ([u, m, b]) => { const r = await fetch(u, { method: m, headers: { Authorization: 'tma ' + window.Telegram.WebApp.initData, 'Content-Type': 'application/json', 'x-idempotency-key': crypto.randomUUID() }, body: b ? JSON.stringify(b) : undefined }); return { s: r.status, j: await r.json().catch(() => null) }; }, [API + path, method, body]);
 const step = async (n, fn) => { try { await fn(); } catch (e) { ok(n, false, e.message.split('\n')[0]); } };
 
 let p = await open('');
@@ -84,7 +84,12 @@ for (const [id, n] of [['leaders', 'L08-leaders'], ['friends', 'L09-friends'], [
   await p.close(); }
 
 p = await open('', 3000);
-await step('feed', async () => { const fd = (await apiJson(p, '/v1/feed')).j; ok('live feed has our plays', (fd?.feed || []).length > 0, `${fd?.feed?.length} items`); await shot(p, 'L11-home-after'); });
+// make sure there is at least one real win to show (QA balance only; bank delta is returned by the cleanup script)
+for (let i = 0; i < 10; i++) { const f0 = (await apiJson(p, '/v1/feed')).j; if ((f0?.feed || []).length) break; await apiJson(p, '/v1/wheel', 'POST', { bet: 10 }); await sleep(2500); }
+await p.close(); p = await open('', 3000);
+await step('feed', async () => { const fd = (await apiJson(p, '/v1/feed')).j; ok('live feed has our plays', (fd?.feed || []).length > 0, `${fd?.feed?.length} wins, 24h stats ${JSON.stringify(fd?.stats)}`);
+  await sleep(16000); ok('feed live chip (real 24h count) rendered', await p.locator('.chip-live').count() > 0, await p.locator('.chip-live').first().textContent().catch(() => ''));
+  const ago = await p.locator('.feed .chip-item').allTextContents(); ok('feed chips show real age', ago.some((x) => /мин|только что|ч$/.test(x)), ago.slice(0, 3).join(' | ')); await shot(p, 'L11-home-after'); });
 p = await open('?tab=profile', 2500); await shot(p, 'L12-profile'); await p.close();
 
 const bad = apiCalls.filter((c) => !/ 2\d\d$/.test(c));
