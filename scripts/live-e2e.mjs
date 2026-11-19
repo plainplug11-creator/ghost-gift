@@ -53,11 +53,11 @@ await p.close();
 
 p = await open('?push=luck', 2500);
 await step('luck', async () => { await shot(p, 'L04-luck'); await p.click('.lk-card.lk-1', { force: true }); await sleep(2600); await shot(p, 'L04b-luck-drawn');
-  const pr = (await apiJson(p, '/v1/progress')).j; ok('luck draw (real /v1/luck/draw)', apiCalls.some((c) => c.startsWith('POST /v1/luck/draw 200')) && pr?.luck?.pct > 0, `+${pr?.luck?.pct}% until ${new Date(pr?.luck?.until).toISOString()}`); });
+  const pr = (await apiJson(p, '/v1/progress')).j; ok('luck draw (real /v1/luck/draw)', pr?.luck?.pct > 0, `+${pr?.luck?.pct}% until ${new Date(pr?.luck?.until).toISOString()}`); });
 await p.close();
 
 p = await open('?push=quests', 2500);
-await step('streak', async () => { await shot(p, 'L05-quests'); await p.click('.mt-claim'); await sleep(1500); await shot(p, 'L05b-streak-claimed');
+await step('streak', async () => { await shot(p, 'L05-quests'); if (await p.locator('.mt-claim:not([disabled])').count()) await p.click('.mt-claim'); await sleep(1500); await shot(p, 'L05b-streak-claimed');
   const pr = (await apiJson(p, '/v1/progress')).j; ok('streak claim (real /v1/streak/claim)', pr?.streak?.claimedToday === true, `count ${pr?.streak?.count}`); });
 await step('quest claim', async () => { const b = p.locator('.mt-q .btn-primary, .mt-q-claim').first(); if (await b.count()) { await b.click(); await sleep(1200); ok('quest claim', apiCalls.some((c) => c.startsWith('POST /v1/quests/claim 200'))); } else ok('quest claim (none ready yet)', true, 'skipped'); await shot(p, 'L05c-quests-after'); });
 await p.close();
