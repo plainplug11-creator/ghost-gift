@@ -85,6 +85,9 @@ async function onText(ctx: Ctx, msg: Any) {
   ] };
   if (cmd === '/start') {
     await startUser(ctx, fromId, args[0] ?? '');
+    // deep links from the Mini App: ?start=help (support) · ?start=notify (open the chat for reminders)
+    if (args[0] === 'help') { await send(ctx, msg.chat.id, text(L, 'help'), { reply_markup: playKb }); return { start: true, help: true }; }
+    if (args[0] === 'notify') { await send(ctx, msg.chat.id, text(L, 'notify_ready'), { reply_markup: playKb }); return { start: true, notify: true }; }
     await sendWelcome(ctx, msg.chat.id, L, menuKb);
     return { start: true };
   }
