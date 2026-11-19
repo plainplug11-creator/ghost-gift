@@ -401,7 +401,7 @@ const en: Record<I18nKey, string> = {
   'feed.agoH': '{n} h',
   'feed.agoD': '{n} d',
   'feed.live': 'Live now',
-  'feed.liveStat': '{n} plays · {p} players in 24 h',
+  'feed.liveStat': 'Plays in 24 h: {n} · players: {p}',
   'home.level': 'Level',
   'home.quests': 'Quests',
   'home.leaders': 'Leaders',

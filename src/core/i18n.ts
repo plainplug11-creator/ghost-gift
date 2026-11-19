@@ -407,7 +407,7 @@ const ru = {
   'feed.agoH': '{n} ч',
   'feed.agoD': '{n} дн',
   'feed.live': 'Сейчас в игре',
-  'feed.liveStat': '{n} игр · {p} игроков за 24 ч',
+  'feed.liveStat': 'Игр за 24 ч: {n} · игроков: {p}',
   'home.level': 'Уровень',
   'home.quests': 'Задания',
   'home.leaders': 'Лидеры',

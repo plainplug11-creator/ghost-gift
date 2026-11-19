@@ -401,7 +401,7 @@ const uk: Record<I18nKey, string> = {
   'feed.agoH': '{n} год',
   'feed.agoD': '{n} дн',
   'feed.live': 'Зараз у грі',
-  'feed.liveStat': '{n} ігор · {p} гравців за 24 год',
+  'feed.liveStat': 'Ігор за 24 год: {n} · гравців: {p}',
   'home.level': 'Рівень',
   'home.quests': 'Завдання',
   'home.leaders': 'Лідери',
